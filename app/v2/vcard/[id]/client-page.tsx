@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Phone, Mail, MapPin, Globe, Download, Share2 } from 'lucide-react';
 import { renderVCardLayout } from '../../../components/vcard-theme-runtime';
 import { AutomotiveBrandHero } from '../../../components/automotive-brand-hero';
+import { buildMailto, getPositionGroup, isSafePublicUrl } from '@/lib/vcard-profile';
 
 interface VCardTheme {
   id?: string;
@@ -59,10 +60,24 @@ interface VCardData {
   activeGlobalTheme?: VCardTheme | null;
 }
 
-export default function ClientVCardPage({ initialData, vCardId }: { initialData?: VCardData | null; vCardId: string }) {
+export default function ClientVCardPage({ initialData, vCardId, disableTracking = false }: { initialData?: VCardData | null; vCardId: string; disableTracking?: boolean }) {
   const [vcard, setVcard] = useState<VCardData['vcard'] | null>(initialData?.vcard || null);
   const [activeGlobalTheme, setActiveGlobalTheme] = useState<VCardTheme | null>(initialData?.activeGlobalTheme || null);
   const [loadingData, setLoadingData] = useState(!initialData?.vcard);
+
+  const recordScan = async (databaseVCardId: string) => {
+    const query = new URLSearchParams(window.location.search);
+    const scanMethod = query.has('sig') ? 'QR' : 'DIRECT';
+    try {
+      await fetch('/api/vcards/scans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vcardId: databaseVCardId, scanMethod }),
+      });
+    } catch (error) {
+      console.error('Error recording scan:', error);
+    }
+  };
 
   useEffect(() => {
     // Fallback: if SSR data is missing, load directly from API on client.
@@ -85,9 +100,11 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
       })();
     }
 
-    // Record scan on load
-    recordScan();
   }, [vCardId, initialData?.vcard]);
+
+  useEffect(() => {
+    if (!disableTracking && vcard?.id) void recordScan(vcard.id);
+  }, [disableTracking, vcard?.id]);
 
   if (loadingData) {
     return (
@@ -96,18 +113,6 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
       </div>
     );
   }
-
-  const recordScan = async () => {
-    try {
-      await fetch('/api/vcards/scans', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vcardId: vCardId, scanMethod: 'QR' }),
-      });
-    } catch (e) {
-      console.error('Error recording scan:', e);
-    }
-  };
 
   const handleDownloadVCard = async () => {
     try {
@@ -152,7 +157,7 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
   };
 
   const trackClick = (actionType: string) => {
-    if (!vcard?.id) return;
+    if (disableTracking || !vcard?.id) return;
     fetch('/api/vcards/click', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -171,32 +176,18 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
     const recipient = vcard?.user?.email;
     if (!recipient) return;
 
-    const position = (vcard?.user?.position || '').toLowerCase();
-    const person = vcard?.user?.name || 'Estimado asesor';
-
-    let subject = 'Consulta de información';
-    let request = 'Deseo solicitar información sobre sus servicios.';
-
-    if (/venta|comercial|sales/.test(position)) {
-      subject = 'Consulta comercial y cotización';
-      request = 'Me gustaría conocer los vehículos disponibles, precios y opciones comerciales.';
-    } else if (/servicio|taller|tecnico|mecanic|mantenimiento/.test(position)) {
-      subject = 'Solicitud de servicio automotriz';
-      request = 'Deseo consultar sobre mantenimiento o diagnóstico de mi vehículo.\\n\\nModelo: \\nAño: \\nServicio requerido: ';
-    } else if (/repuesto|almacen|bodega/.test(position)) {
-      subject = 'Cotización de repuestos';
-      request = 'Solicito disponibilidad y cotización de repuestos.\\n\\nVehículo: \\nRepuesto: \\nCantidad: ';
-    } else if (/gerente|director|jefe|coordinador/.test(position)) {
-      subject = 'Solicitud de comunicación institucional';
-      request = 'Deseo comunicarme para consultar el siguiente asunto: ';
-    }
-
-    const body = `Buen día, ${person}:\\n\\n${request}\\n\\nQuedo pendiente de su respuesta.\\n\\nSaludos cordiales.`;
-
     trackClick('email');
+    window.location.href = buildMailto(recipient, vcard?.user?.name || 'asesor', vcard?.user?.position);
+  };
 
-    window.location.href =
-      `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const handleSchedule = () => {
+    const recipient = vcard?.user?.email;
+    if (!recipient) {
+      alert('Para coordinar una cita, utiliza llamada o WhatsApp.');
+      return;
+    }
+    trackClick('email');
+    window.location.href = buildMailto(recipient, vcard.user.name, vcard.user.position, 'appointment');
   };
 
   const handleWhatsApp = () => {
@@ -244,14 +235,6 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
   const companySeasonalTheme = vcard?.branch?.company?.seasonalVcardTheme?.isActive && isThemeInWindow(vcard.branch.company.seasonalVcardTheme)
     ? vcard.branch.company.seasonalVcardTheme
     : null;
-
-  const getPositionGroup = (position?: string | null) => {
-    const value = (position || '').toLowerCase();
-    if (/gerente|jefe|encargad|manager|director|coordinador/.test(value)) return 'MANAGEMENT';
-    if (/venta|sales|comercial/.test(value)) return 'SALES';
-    if (/servicio|service|taller|advisor/.test(value)) return 'SERVICE';
-    return 'OTHER';
-  };
 
   const userPositionGroup = getPositionGroup(vcard?.user?.position);
   const roleRule = (vcard?.branch?.vcardPositionThemeRules || []).find((rule) => rule.positionGroup === userPositionGroup);
@@ -309,7 +292,9 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
                 onWhatsApp: handleWhatsApp,
                 onDownload: handleDownloadVCard,
                 onShare: handleShare,
+                onSchedule: handleSchedule,
                 onOpenUrl: (url) => {
+                  if (!isSafePublicUrl(url)) return;
                   if (url.includes('wa.me/')) {
                     trackClick('wa');
                   }
@@ -343,7 +328,9 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
                 onWhatsApp: handleWhatsApp,
                 onDownload: handleDownloadVCard,
                 onShare: handleShare,
+                onSchedule: handleSchedule,
                 onOpenUrl: (url) => {
+                  if (!isSafePublicUrl(url)) return;
                   if (url.includes('wa.me/')) {
                     trackClick('wa');
                   }
@@ -393,12 +380,12 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
   };
 
   return (
-    <div className="page-background min-h-screen py-8 px-4">
-      <AutomotiveBrandHero
+    <div className="vcard-v2-page page-background min-h-screen px-4 py-5 sm:py-8">
+      {!layoutConfig.some((block: any) => block?.type === 'Header' || block?.type === 'SeasonalHero') ? <AutomotiveBrandHero
         company={vcard.branch?.companyName || vcard.branch?.name || 'Ford Yude'}
         branch={vcard.branch?.name}
         imageUrl={bgImageUrl}
-      />
+      /> : null}
       {renderContent()}
       <style jsx>{`
         .legacy-header {
@@ -409,6 +396,21 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
           background: ${bgImageUrl ? `url(${bgImageUrl})` : `linear-gradient(135deg, ${primaryColor}20, ${secondaryColor})`};
           background-size: cover;
           background-position: center;
+        }
+      `}</style>
+      <style jsx global>{`
+        @media (prefers-reduced-motion: reduce) {
+          .vcard-v2-page *,
+          .vcard-v2-page *::before,
+          .vcard-v2-page *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            scroll-behavior: auto !important;
+          }
+          .vcard-v2-page .vc-motion-control {
+            transform: none !important;
+            transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease !important;
+          }
         }
       `}</style>
     </div>

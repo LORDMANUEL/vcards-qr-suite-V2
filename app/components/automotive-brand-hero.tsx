@@ -1,6 +1,7 @@
 'use client';
 
 import { CarFront, Wrench, ShieldCheck } from 'lucide-react';
+import { detectVCardBrand } from '@/lib/vcard-profile';
 
 interface Props {
   company: string;
@@ -13,13 +14,7 @@ export function AutomotiveBrandHero({
   branch,
   imageUrl,
 }: Props) {
-  const identifier = `${company} ${branch || ''}`.toLowerCase();
-
-  const brand = /gac/.test(identifier)
-    ? 'gac'
-    : /quick\s*lane|quicklane/.test(identifier)
-    ? 'quicklane'
-    : 'ford';
+  const brand = detectVCardBrand(company, branch);
 
   const designs = {
     ford: {
@@ -42,6 +37,13 @@ export function AutomotiveBrandHero({
       headline: 'TU VEHÍCULO EN LAS MEJORES MANOS',
       primary: '#101B31',
       accent: '#FF7515',
+    },
+    generic: {
+      title: company || 'VCARD CORPORATIVA',
+      subtitle: branch || 'Contacto digital',
+      headline: 'ESTAMOS PARA AYUDARTE',
+      primary: '#172033',
+      accent: '#5FA8D3',
     },
   };
 

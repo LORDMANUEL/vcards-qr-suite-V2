@@ -24,6 +24,7 @@ export interface RuntimeActionHandlers {
   onWhatsApp: () => void;
   onDownload: () => void;
   onShare: () => void;
+  onSchedule?: () => void;
   onOpenUrl: (url: string) => void;
 }
 
@@ -126,6 +127,19 @@ function VCardAnimationStyles() {
       @keyframes vcBounce { 0%{opacity:0;transform:scale(0.7)} 60%{transform:scale(1.06)} 100%{opacity:1;transform:scale(1)} }
       @keyframes vcPulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
       @keyframes vcShake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+      @media (prefers-reduced-motion: reduce) {
+        .vc-animated-block {
+          animation-name: vcFadeIn !important;
+          animation-duration: 150ms !important;
+          animation-delay: 0ms !important;
+          animation-iteration-count: 1 !important;
+        }
+        .vc-motion-control {
+          animation: none !important;
+          transform: none !important;
+          transition: opacity 150ms ease, background-color 150ms ease, color 150ms ease !important;
+        }
+      }
     `}</style>
   );
 }
@@ -180,12 +194,12 @@ export function renderVCardLayout({ layout, profile, handlers }: { layout: any[]
     const anim = blockAnimStyle(p);
 
     if (block.type === 'SeasonalHero') {
-      return <div key={block.id} style={anim}><SeasonalScene props={p} /></div>;
+      return <div key={block.id} className="vc-animated-block" style={anim}><SeasonalScene props={p} /></div>;
     }
 
     if (block.type === 'Header') {
       return (
-        <div key={block.id} style={{ backgroundColor: p.bgColor, color: p.textColor, backgroundImage: p.backgroundImageUrl ? `url(${p.backgroundImageUrl})` : undefined, backgroundSize: 'cover', backgroundPosition: p.backgroundPosition || 'center', borderTopLeftRadius: 28, borderTopRightRadius: 28, minHeight: p._height || undefined, boxSizing: 'border-box', ...anim }} className="p-8 pb-10 text-center relative overflow-hidden">
+        <div key={block.id} style={{ backgroundColor: p.bgColor, color: p.textColor, backgroundImage: p.backgroundImageUrl ? `url(${p.backgroundImageUrl})` : undefined, backgroundSize: 'cover', backgroundPosition: p.backgroundPosition || 'center', borderTopLeftRadius: 28, borderTopRightRadius: 28, minHeight: p._height || undefined, boxSizing: 'border-box', ...anim }} className="vc-animated-block p-8 pb-10 text-center relative overflow-hidden">
           {p.backgroundVideoUrl ? <video className="absolute inset-0 h-full w-full object-cover" src={p.backgroundVideoUrl} autoPlay muted loop playsInline /> : null}
           <div className="relative z-10">
           {p.logoUrl || profile.logoUrl ? <img src={p.logoUrl || profile.logoUrl || ''} alt="Logo" className={`mb-3 rounded-2xl bg-white/10 p-2 object-contain ${p.logoAlign === 'left' ? 'mr-auto' : p.logoAlign === 'right' ? 'ml-auto' : 'mx-auto'}`} style={{ height: `${p.logoHeight || 90}px`, width: p.logoWidth ? `${p.logoWidth}px` : 'auto' }} /> : null}
@@ -430,7 +444,7 @@ export function renderVCardLayout({ layout, profile, handlers }: { layout: any[]
               border: p.borderWidth ? `${p.borderWidth}px solid ${p.borderColor || 'transparent'}` : 'none',
               boxShadow: p.shadowEnabled !== false ? '0 4px 14px rgba(0,0,0,0.15)' : 'none',
             }}
-            className={`flex w-full items-center justify-center gap-2 py-4 text-sm font-bold transition-all duration-300 hover:scale-[1.02] hover:brightness-110 active:scale-[0.98] ${buttonStyle}`}
+            className={`vc-motion-control flex w-full items-center justify-center gap-2 py-4 text-sm font-bold transition-all duration-300 hover:scale-[1.02] hover:brightness-110 active:scale-[0.98] ${buttonStyle}`}
           >
             {p.iconType === 'whatsapp' && <span>💬</span>}
             {p.iconType === 'phone' && <span>📞</span>}
@@ -523,7 +537,10 @@ export function renderVCardLayout({ layout, profile, handlers }: { layout: any[]
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, buttons.length)}, 1fr)`, gap: p.gap || 12 }}>
             {buttons.map((btn: any) => {
               const handleBtnClick = () => {
-                if (btn.actionType === 'url' && btn.actionUrl) {
+                const isSchedule = btn.iconType === 'calendar' || /agenda|cita/i.test(btn.label || '');
+                if (isSchedule && handlers.onSchedule) {
+                  handlers.onSchedule();
+                } else if (btn.actionType === 'url' && btn.actionUrl) {
                   window.open(btn.actionUrl, '_blank', 'noopener,noreferrer');
                 } else if (btn.actionType === 'tel' && btn.phoneNumber) {
                   window.location.href = `tel:${btn.phoneNumber}`;
@@ -548,7 +565,7 @@ export function renderVCardLayout({ layout, profile, handlers }: { layout: any[]
                     border: btn.borderWidth ? `${btn.borderWidth}px solid ${btn.borderColor || '#e5e7eb'}` : 'none',
                     minHeight: 68,
                   }}
-                  className="flex flex-col items-center justify-center gap-1.5 px-3 py-3.5 text-xs font-bold shadow-sm transition hover:brightness-110 active:scale-95"
+                  className="vc-motion-control flex flex-col items-center justify-center gap-1.5 px-3 py-3.5 text-xs font-bold shadow-sm transition hover:brightness-110 active:scale-95"
                 >
                   {btn.iconEmoji && !BtnIcon ? <span className="text-xl leading-none">{btn.iconEmoji}</span> : null}
                   {BtnIcon ? <BtnIcon className="h-5 w-5" /> : null}
