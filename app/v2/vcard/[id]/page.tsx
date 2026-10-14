@@ -1,10 +1,13 @@
-import { Suspense } from 'react';
+import { cache, Suspense } from 'react';
+import type { Metadata } from 'next';
 import { prisma } from '@/lib/prisma';
 import ClientVCardPage from './client-page';
+import { notFound } from 'next/navigation';
+import { verifyVCardSignature } from '@/lib/security';
 
-async function getVCardData(id: string) {
+const getVCardData = cache(async (id: string) => {
   const vcard = await prisma.vCard.findFirst({
-    where: { qrCodeData: id },
+    where: { qrCodeData: id, isActive: true, user: { isActive: true } },
     include: {
       user: {
         select: {
@@ -56,6 +59,16 @@ async function getVCardData(id: string) {
   });
 
   return JSON.parse(JSON.stringify({ vcard, activeGlobalTheme }));
+});
+
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const data = await getVCardData(params.id);
+  if (!data?.vcard) return { title: 'vCard no encontrada' };
+  const company = data.vcard.branch?.companyName || data.vcard.branch?.name || 'Contacto digital';
+  return {
+    title: `${data.vcard.user.name} | ${company}`,
+    description: `Contacto profesional de ${data.vcard.user.name} en ${company}.`,
+  };
 }
 
 export default async function PublicVCardPage({
@@ -66,6 +79,8 @@ export default async function PublicVCardPage({
   searchParams?: { sig?: string };
 }) {
   const { id } = params;
+  if (!verifyVCardSignature(id, searchParams?.sig)) notFound();
   const data = await getVCardData(id);
+  if (!data) notFound();
   return <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#003478]"></div></div>}><ClientVCardPage initialData={data} vCardId={id} /></Suspense>;
 }

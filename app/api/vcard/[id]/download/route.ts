@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateVCardString } from '@/lib/qr-generator';
+import { securityCheck } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,9 +10,12 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const security = await securityCheck(request, params.id);
+    if (!security.allowed) return security.response;
+
     // Find vCard by qrCodeData
     const vcard = await prisma.vCard.findFirst({
-      where: { qrCodeData: params.id },
+      where: { qrCodeData: params.id, isActive: true, user: { isActive: true } },
       include: {
         user: true,
         branch: true,
