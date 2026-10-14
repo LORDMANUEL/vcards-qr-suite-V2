@@ -1,0 +1,24 @@
+[Unit]
+Description=Ford Yude Canahuati - Admin Web (vcard-admin)
+Documentation=https://github.com/
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=vcard
+Group=vcard
+WorkingDirectory=/opt/vcard-system
+Environment=NODE_ENV=production
+Environment=PORT=3000
+EnvironmentFile=/opt/vcard-system/.env
+ExecStart=/usr/bin/npm run start -- --port 3000
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65535
+TimeoutStartSec=0
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=vcard-admin
+
+[Install]
+WantedBy=multi-user.target

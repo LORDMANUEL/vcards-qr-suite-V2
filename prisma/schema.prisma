@@ -1,0 +1,349 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  IT
+  MARKETING
+  MARKETING_MANAGER
+  SAC
+  SALES_MANAGER
+  ADVISOR
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String
+  role          UserRole  @default(ADVISOR)
+  isSystemUser  Boolean   @default(true)
+  position      String?
+  phone         String?
+  photoUrl      String?
+  website       String?
+  branchId      String?
+  branch        Branch?   @relation(fields: [branchId], references: [id])
+  isActive      Boolean   @default(true)
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
+  twoFactorEnabled     Boolean   @default(false)
+  twoFactorSecret      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+  vcards        VCard[]
+}
+
+model Company {
+  id                   String   @id @default(cuid())
+  name                 String   @unique
+  slug                 String?  @unique
+  logoUrl              String?
+  primaryColor         String   @default("#003478")
+  secondaryColor       String   @default("#FFFFFF")
+  defaultVcardThemeId  String?
+  defaultVcardTheme    Theme?   @relation("CompanyDefaultVCardTheme", fields: [defaultVcardThemeId], references: [id])
+  seasonalVcardThemeId String?
+  seasonalVcardTheme   Theme?   @relation("CompanySeasonalVCardTheme", fields: [seasonalVcardThemeId], references: [id])
+  branches             Branch[]
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Branch {
+  id             String   @id @default(cuid())
+  companyName    String?  @default("Ford Yude Canahuati")
+  companyId      String?
+  company        Company? @relation(fields: [companyId], references: [id])
+  name           String
+  address        String?
+  city           String?
+  country        String?
+  primaryColor   String   @default("#003478")
+  secondaryColor String   @default("#FFFFFF")
+  logoUrl        String?
+  portalThemeId  String?
+  portalTheme    Theme?   @relation("PortalTheme", fields: [portalThemeId], references: [id])
+  vcardThemeId   String?
+  vcardTheme     Theme?   @relation("VCardTheme", fields: [vcardThemeId], references: [id])
+  seasonalVcardThemeId String?
+  seasonalVcardTheme   Theme? @relation("SeasonalVCardTheme", fields: [seasonalVcardThemeId], references: [id])
+  sortOrder      Int      @default(0)
+  themeId        String? // Para compatibilidad legacy
+  theme          Theme?   @relation("LegacyTheme", fields: [themeId], references: [id])
+  routerSerial   String?
+  ssidTarget     String?
+  setupGuide     String?  // Markdown para el instalador
+  uniqueSlug     String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  users          User[]
+  vcards         VCard[]
+  accessPoints   AccessPoint[]
+  portalSessions PortalSession[]
+  portalConfig   PortalConfig?
+  vcardPositionThemeRules VCardPositionThemeRule[]
+
+  @@index([companyId])
+}
+
+model VCardPositionThemeRule {
+  id            String   @id @default(cuid())
+  branchId      String
+  branch        Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  positionGroup String
+  themeId       String?
+  theme         Theme?   @relation("PositionThemeRuleTheme", fields: [themeId], references: [id])
+  isEnabled     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([branchId, positionGroup])
+  @@index([themeId])
+}
+
+model VCard {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branchId      String?
+  branch        Branch?  @relation(fields: [branchId], references: [id])
+  qrCodeData    String   @unique
+  qrImageUrl    String?
+  isActive      Boolean  @default(true)
+  downloadCount Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  scans         Scan[]
+}
+
+model Scan {
+  id          String   @id @default(cuid())
+  vcardId     String
+  vcard       VCard    @relation(fields: [vcardId], references: [id], onDelete: Cascade)
+  ipAddress   String?
+  country     String?
+  city        String?
+  deviceType  String?
+  userAgent   String?
+  scanMethod  String?  @default("QR")
+  scannedAt   DateTime @default(now())
+}
+
+enum ThemeCategory {
+  VCARD
+  PORTAL
+  ADMIN
+  CARD
+}
+
+enum ThemeType {
+  FESTIVE
+  CORPORATE
+  SEASONAL
+}
+
+model Theme {
+  id          String        @id @default(cuid())
+  name        String
+  category    ThemeCategory @default(VCARD)
+  type        ThemeType     @default(CORPORATE)
+  colors      String        @default("{\"primary\":\"#003478\",\"secondary\":\"#FFFFFF\",\"accent\":\"#10B981\"}")
+  typography  String?       @default("Inter")
+  config      Json?         // Para el estado del canvas: opacidades, gradientes, capas de fondo
+  htmlTemplate String?      @db.Text // Estructura completa de la página (Builder)
+  cssCustom   String?       @db.Text // Estilos personalizados en cascada
+  bgImageUrl  String?
+  isActive    Boolean       @default(true)
+  validFrom   DateTime?
+  validTo     DateTime?
+  companyId   String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  portalBranches Branch[]       @relation("PortalTheme")
+  vcardBranches  Branch[]       @relation("VCardTheme")
+  seasonalVcardBranches Branch[] @relation("SeasonalVCardTheme")
+  legacyBranches Branch[]       @relation("LegacyTheme")
+  portalAccessPoints AccessPoint[] @relation("PortalAccessPointTheme")
+  companyDefaultVcardThemes Company[] @relation("CompanyDefaultVCardTheme")
+  companySeasonalVcardThemes Company[] @relation("CompanySeasonalVCardTheme")
+  vcardPositionThemeRules VCardPositionThemeRule[] @relation("PositionThemeRuleTheme")
+}
+
+enum AccessPointProvider {
+  GENERIC
+  CUDY
+  OMAADA
+  UNIFI
+  MIKROTIK
+}
+
+model AccessPoint {
+  id           String              @id @default(cuid())
+  name         String
+  identifier   String              @unique
+  providerType AccessPointProvider @default(GENERIC)
+  branchId     String
+  branch       Branch              @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  themeId      String?
+  theme        Theme?              @relation("PortalAccessPointTheme", fields: [themeId], references: [id])
+  ssid         String?
+  wifiPassword String?
+  wifiSecurity String?             @default("WPA")
+  externalUrl  String?
+  radiusNasId  String?
+  radiusSecret String?
+  uamServer    String?
+  uamAllowed   Json?
+  uamDomain    Json?
+  timeLimit    Int                 @default(60)
+  fields       Json?
+  timerVisible Boolean             @default(true)
+  isActive     Boolean             @default(true)
+  outageBypassEnabled Boolean      @default(false)
+  outageBypassNotes String?
+  sessions     PortalSession[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([branchId])
+  @@index([themeId])
+}
+
+model Promotion {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  imageUrl    String?
+  targetUrl   String?
+  isActive    Boolean  @default(true)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  clicks      Int      @default(0)
+}
+
+model Banner {
+  id          String   @id @default(cuid())
+  name        String
+  imageUrl    String
+  targetUrl   String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  clicks      Int      @default(0)
+}
+
+model CaptivePortalLink {
+  id          String   @id @default(cuid())
+  name        String
+  url         String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String   // ID del que realizó la acción
+  action      String   // CREATED, UPDATED, DELETED
+  entityName  String   // Tabla implicada
+  entityId    String   // ID del registro modificado
+  details     String?  // JSON con mas detalle de la acción
+  ipAddress   String?  // IP de donde se originó 
+  createdAt   DateTime @default(now())
+}
+
+model PortalConfig {
+  id                String   @id @default(cuid())
+  branchId          String   @unique
+  branch            Branch   @relation(fields: [branchId], references: [id])
+  collectName       Boolean  @default(true)
+  collectEmail      Boolean  @default(true)
+  collectPhone      Boolean  @default(true)
+  collectCarModel   Boolean  @default(false)
+  collectVehicleYear Boolean @default(false)
+  collectLicensePlate Boolean @default(false)
+  requiredFields    Json?    // Lista dinámica: [Name, Email, Phone, RTN, VIN, Plate, CarModel, Year]
+  sessionLimit      Int      @default(180) // 180 mins = 3h
+  renewalLimit      Int      @default(60)  // 60 mins = 1h
+  isActive          Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
+}
+
+model PortalSession {
+  id            String   @id @default(cuid())
+  macAddress    String   @unique
+  ipAddress     String?
+  name          String?
+  email         String?
+  phone         String?
+  carModel      String?
+  vehicleYear   String?
+  licensePlate  String?
+  rtn           String?
+  vin           String?
+  metadata      Json?
+  status        String   @default("PENDING") // PENDING, AUTHORIZED, EXPIRED
+  timeLimit     Int?
+  expiresAt     DateTime?
+  authorizedAt  DateTime?
+  revokedAt     DateTime?
+  renewalCount  Int      @default(0)
+  lastRenewalAt DateTime?
+  branchId      String?
+  branch        Branch?  @relation(fields: [branchId], references: [id])
+  apId          String?
+  accessPoint   AccessPoint? @relation(fields: [apId], references: [id])
+  statusDetail  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([apId])
+  @@index([status])
+}

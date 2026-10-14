@@ -1,0 +1,24 @@
+[Unit]
+Description=Ford Yude Canahuati - Admin Web (vcard-admin) - Puerto 9301
+Documentation=https://github.com/
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=yc
+Group=yc
+WorkingDirectory=/home/yc/vcard-system
+Environment=NODE_ENV=production
+Environment=PORT=9301
+EnvironmentFile=/home/yc/vcard-system/.env
+ExecStart=/usr/bin/npm run start -- --port 9301
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=65535
+TimeoutStartSec=0
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=vcard-admin
+
+[Install]
+WantedBy=multi-user.target

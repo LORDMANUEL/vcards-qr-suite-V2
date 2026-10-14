@@ -1,0 +1,29 @@
+[Unit]
+Description=Ford Yude Canahuati - Portal Daemon (vcard-system)
+Documentation=https://github.com/
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=vcard
+Group=vcard
+WorkingDirectory=/opt/vcard-system
+Environment=NODE_ENV=production
+Environment=PORT=3001
+# Lee las variables de entorno desde el archivo .env (DATABASE_URL, NEXTAUTH_SECRET)
+EnvironmentFile=/opt/vcard-system/.env
+
+# Portal daemon para routers / access points
+ExecStart=/usr/bin/npm run start -- --port 3001
+Restart=on-failure
+RestartSec=10
+
+# Limites de sistema
+LimitNOFILE=65535
+TimeoutStartSec=0
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=vcard-system
+
+[Install]
+WantedBy=multi-user.target
