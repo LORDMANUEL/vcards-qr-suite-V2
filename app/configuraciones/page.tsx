@@ -237,7 +237,7 @@ export default function ConfiguracionesPage() {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
                   <div className="p-5 border-b border-gray-100 bg-green-50 flex items-center gap-3">
                     <Globe className="w-5 h-5 text-green-600" />
-                    <h3 className="text-lg font-bold text-gray-900 border-none font-black">Seguridad SSL (Let's Encrypt)</h3>
+                    <h3 className="text-lg font-bold text-gray-900 border-none font-black">Seguridad SSL (Let&apos;s Encrypt)</h3>
                   </div>
                   <div className="p-6">
                     <p className="text-sm text-gray-600 mb-4">Configura y renueva automáticamente certificados SSL para el dominio del portal.</p>

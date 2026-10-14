@@ -1284,7 +1284,7 @@ function EditorContent({ initialThemeId }: { initialThemeId?: string }) {
                       )}
                       {element.kind === 'testimonial' && (
                         <div className="h-full w-full p-4 rounded-2xl flex flex-col justify-center" style={{ backgroundColor: element.backgroundColor || '#f8fafc', borderRadius: element.borderRadius }}>
-                          <div className="text-lg font-serif italic text-center mb-2" style={{ color: element.color || '#1e293b' }}>"{element.text || 'Excelente servicio'}"</div>
+                          <div className="text-lg font-serif italic text-center mb-2" style={{ color: element.color || '#1e293b' }}>&ldquo;{element.text || 'Excelente servicio'}&rdquo;</div>
                           <div className="text-sm font-bold text-center" style={{ color: element.color || '#64748b' }}>{element.subtext || '- Cliente'}</div>
                         </div>
                       )}
