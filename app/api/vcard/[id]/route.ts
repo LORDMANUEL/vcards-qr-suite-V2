@@ -16,7 +16,7 @@ export async function GET(
 
     // Find vCard by qrCodeData (the ID in the URL)
     const vcard = await prisma.vCard.findFirst({
-      where: { qrCodeData: params.id },
+      where: { qrCodeData: params.id, isActive: true, user: { isActive: true } },
       include: {
         user: {
           select: {

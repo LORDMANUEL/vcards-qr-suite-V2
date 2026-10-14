@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getDeviceType, getLocationFromIP } from '@/lib/geolocation';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { canViewVcards } from '@/lib/permissions';
 
 const RATE_LIMIT_MS = 60000;
 const MAX_SCANS_PER_MINUTE = Number(process.env.VCARD_MAX_SCANS_PER_MINUTE || 15);
@@ -42,10 +45,10 @@ export async function POST(request: NextRequest) {
 
     const vcard = await prisma.vCard.findUnique({
       where: { id: String(vcardId) },
-      select: { id: true },
+      select: { id: true, isActive: true, user: { select: { isActive: true } } },
     });
 
-    if (!vcard) {
+    if (!vcard || !vcard.isActive || !vcard.user.isActive) {
       return NextResponse.json({ error: 'vCard not found' }, { status: 404 });
     }
 
@@ -80,7 +83,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, scan });
+    return NextResponse.json({ success: true, scanId: scan.id });
   } catch (error) {
     console.error('Error recording scan:', error);
     return NextResponse.json({ error: 'Error recording scan' }, { status: 500 });
@@ -88,6 +91,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user || !canViewVcards(session.user.role)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   const { searchParams } = new URL(request.url);
   const vcardId = searchParams.get('vcardId');
   const page = Math.max(0, parseInt(searchParams.get('page') || '0', 10));

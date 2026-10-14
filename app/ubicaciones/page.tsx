@@ -676,7 +676,7 @@ export default function UbicacionesPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-black uppercase tracking-tight">Manual de Configuración IT</h3>
-                  <p className="text-xs text-blue-400 font-mono">{selectedBranch.name} // SSID: {selectedBranch.ssidTarget}</p>
+                  <p className="text-xs text-blue-400 font-mono">{selectedBranch.name} {'//'} SSID: {selectedBranch.ssidTarget}</p>
                 </div>
               </div>
               <button onClick={() => setShowGuideModal(false)} className="p-2 hover:bg-gray-800 rounded-full transition-colors">

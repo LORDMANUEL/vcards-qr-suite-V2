@@ -1,10 +1,20 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import CryptoJS from 'crypto-js';
+import { timingSafeEqual } from 'node:crypto';
 
 const MAX_SCANS_PER_MINUTE = Number(process.env.VCARD_MAX_SCANS_PER_MINUTE || 15);
 const WINDOW_MS = 60 * 1000;
 const REQUIRE_VCARD_SIGNATURE = process.env.REQUIRE_VCARD_SIGNATURE === 'true';
+
+export function verifyVCardSignature(vcardId: string, signature?: string | null) {
+    if (!signature) return !REQUIRE_VCARD_SIGNATURE;
+    const secret = process.env.NEXTAUTH_SECRET;
+    if (!secret) return false;
+    const expected = CryptoJS.HmacSHA256(vcardId, secret).toString(CryptoJS.enc.Hex);
+    if (signature.length !== expected.length) return false;
+    return timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+}
 
 function extractIp(req: Request) {
     return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
@@ -86,9 +96,7 @@ export async function securityCheck(req: Request, vcardId?: string) {
                 ip
             };
         }
-        const expectedSignature = CryptoJS.HmacSHA256(vcardId, secret).toString(CryptoJS.enc.Hex);
-
-        if (signature !== expectedSignature) {
+        if (!verifyVCardSignature(vcardId, signature)) {
             console.error(`[SECURITY] Firma Criptográfica Invalida en vCard ${vcardId} desde IP ${ip}`);
 
             await prisma.auditLog.create({
