@@ -64,6 +64,22 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
   const [loadingData, setLoadingData] = useState(!initialData?.vcard);
 
   useEffect(() => {
+    const recordScan = async (databaseVCardId: string) => {
+      try {
+        const query = new URLSearchParams(window.location.search);
+        await fetch('/api/vcards/scans', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            vcardId: databaseVCardId,
+            scanMethod: query.has('sig') ? 'QR' : 'DIRECT',
+          }),
+        });
+      } catch (error) {
+        console.error('Error recording scan:', error);
+      }
+    };
+
     // Fallback: if SSR data is missing, load directly from API on client.
     if (!initialData?.vcard && vCardId) {
       (async () => {
@@ -76,6 +92,7 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
           const payload = await response.json();
           setVcard(payload?.vcard || null);
           setActiveGlobalTheme(payload?.activeGlobalTheme || null);
+          if (payload?.vcard?.id) void recordScan(payload.vcard.id);
         } catch (error) {
           console.error('Error loading vCard on client fallback:', error);
         } finally {
@@ -84,8 +101,7 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
       })();
     }
 
-    // Record scan on load
-    recordScan();
+    if (initialData?.vcard?.id) void recordScan(initialData.vcard.id);
   }, [vCardId, initialData?.vcard]);
 
   if (loadingData) {
@@ -95,18 +111,6 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
       </div>
     );
   }
-
-  const recordScan = async () => {
-    try {
-      await fetch('/api/vcards/scans', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vcardId: vCardId, scanMethod: 'QR' }),
-      });
-    } catch (e) {
-      console.error('Error recording scan:', e);
-    }
-  };
 
   const handleDownloadVCard = async () => {
     try {

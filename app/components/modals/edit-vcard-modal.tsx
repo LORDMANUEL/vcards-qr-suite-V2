@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
+import { OrganizationCascade } from '@/app/components/organization-cascade';
+import { getBranchCity } from '@/lib/vcard-organization';
 
 interface Company {
   id: string;
@@ -48,12 +50,14 @@ export function EditVCardModal({ isOpen, onClose, onSuccess, vcard }: EditVCardM
   const [error, setError] = useState('');
   const [companies, setCompanies] = useState<Company[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [organizationLoading, setOrganizationLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     position: '',
     email: '',
     phone: '',
     companyId: '',
+    city: '',
     branchId: '',
     website: '',
     photoUrl: '',
@@ -61,6 +65,7 @@ export function EditVCardModal({ isOpen, onClose, onSuccess, vcard }: EditVCardM
 
   useEffect(() => {
     if (!isOpen) return;
+    setOrganizationLoading(true);
     Promise.all([fetch('/api/companies'), fetch('/api/branches')])
       .then(async ([companiesRes, branchesRes]) => {
         const companiesData = companiesRes.ok ? await companiesRes.json() : { companies: [] };
@@ -71,6 +76,10 @@ export function EditVCardModal({ isOpen, onClose, onSuccess, vcard }: EditVCardM
       .catch(() => {
         setCompanies([]);
         setBranches([]);
+        setError('No se pudieron cargar empresas, ciudades y sucursales. Intente nuevamente.');
+      })
+      .finally(() => {
+        setOrganizationLoading(false);
       });
   }, [isOpen]);
 
@@ -84,6 +93,7 @@ export function EditVCardModal({ isOpen, onClose, onSuccess, vcard }: EditVCardM
         email: vcard?.user?.email ?? '',
         phone: vcard?.user?.phone ?? '',
         companyId: currentBranch?.companyId ?? vcard?.branch?.companyId ?? '',
+        city: currentBranch ? getBranchCity(branches, currentBranch.id) : (vcard?.branch?.city || ''),
         branchId: currentBranch?.id ?? vcard?.branch?.id ?? '',
         website: vcard?.user?.website ?? 'https://www.yudecanahuati.com',
         photoUrl: vcard?.user?.photoUrl ?? '',
@@ -91,33 +101,30 @@ export function EditVCardModal({ isOpen, onClose, onSuccess, vcard }: EditVCardM
     }
   }, [vcard, branches]);
 
-  if (!isOpen || !vcard) return null;
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    if (name === 'companyId') {
-      const firstBranch = branches.find((branch) => branch.companyId === value);
-      setFormData((prev) => ({ ...prev, companyId: value, branchId: firstBranch?.id || '' }));
-      return;
-    }
-    if (name === 'branchId') {
-      const selectedBranch = branches.find((branch) => branch.id === value);
-      setFormData((prev) => ({ ...prev, branchId: value, companyId: selectedBranch?.companyId || prev.companyId }));
-      return;
-    }
-
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
 
-  const filteredBranches = branches.filter((branch) => !formData.companyId || branch.companyId === formData.companyId);
+  const handleOrganizationChange = useCallback((selection: { companyId: string; city: string; branchId: string }) => {
+    setFormData((prev) => ({ ...prev, ...selection }));
+  }, []);
+
+  if (!isOpen || !vcard) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    if (!formData.companyId || !formData.city || !formData.branchId) {
+      setError('Debe seleccionar empresa, ciudad y sucursal');
+      setLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch(`/api/vcards/${vcard?.id}`, {
@@ -207,37 +214,15 @@ export function EditVCardModal({ isOpen, onClose, onSuccess, vcard }: EditVCardM
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Empresa <span className="text-red-500">*</span></label>
-              <select
-                name="companyId"
-                value={formData?.companyId ?? ''}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#003478] focus:border-transparent"
-              >
-                <option value="">Seleccione una empresa</option>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>{company.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Sucursal <span className="text-red-500">*</span></label>
-              <select
-                name="branchId"
-                value={formData?.branchId ?? ''}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#003478] focus:border-transparent"
-              >
-                <option value="">Seleccione una sucursal</option>
-                {filteredBranches.map((branch) => (
-                  <option key={branch.id} value={branch.id}>{branch.name}{branch.city ? ` (${branch.city})` : ''}</option>
-                ))}
-              </select>
-            </div>
+            <OrganizationCascade
+              companies={companies}
+              branches={branches}
+              companyId={formData.companyId}
+              city={formData.city}
+              branchId={formData.branchId}
+              disabled={organizationLoading || loading}
+              onChange={handleOrganizationChange}
+            />
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Sitio Web</label>

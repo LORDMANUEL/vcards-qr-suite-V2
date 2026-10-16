@@ -73,7 +73,8 @@ export function middleware(req: NextRequest) {
   const hostHeader = req.headers.get('host') || '';
   const reqHost = (hostHeader.includes(':') ? hostHeader.split(':')[0] : hostHeader).toLowerCase() || req.nextUrl.hostname.toLowerCase();
 
-  console.log(`[Middleware] Path: ${pathname}, HostHeader: ${hostHeader}, reqHost: ${reqHost}, search: ${search}`);
+  const queryKeys = Array.from(new Set(req.nextUrl.searchParams.keys())).join(',');
+  console.log(`[Middleware] Path: ${pathname}, HostHeader: ${hostHeader}, reqHost: ${reqHost}, queryKeys: ${queryKeys || 'none'}`);
 
   const portalFlowPath = pathname === '/' || pathname.startsWith('/portal') || pathname.startsWith('/acceso');
   const malformed = hasMalformedPath(pathname) || isRepeatedHostPath(pathname, [reqHost, canonicalHost]);

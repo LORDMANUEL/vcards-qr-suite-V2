@@ -105,7 +105,7 @@ export async function securityCheck(req: Request, vcardId?: string) {
                     action: 'SECURITY_ALERT',
                     entityName: 'VCard',
                     entityId: vcardId,
-                    details: JSON.stringify({ type: 'HMAC_MISMATCH', attemptedSignature: signature }),
+                    details: JSON.stringify({ type: 'HMAC_MISMATCH', signatureProvided: true }),
                     ipAddress: ip
                 }
             }).catch(console.error);

@@ -21,9 +21,10 @@ export async function PUT(
     const canManageAny = canManageCompanies(role);
 
     const body = await request.json();
-    const { name, position, email, phone, website, photoUrl, branchId } = body;
+    const { name, position, email, phone, website, photoUrl, branchId, companyId } = body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
-    if (!name || !email || !branchId) {
+    if (!name || !normalizedEmail || !branchId) {
       return NextResponse.json(
         { error: 'Nombre, email y sucursal son requeridos' },
         { status: 400 }
@@ -51,28 +52,23 @@ export async function PUT(
       return NextResponse.json({ error: 'Sucursal no encontrada' }, { status: 404 });
     }
 
-    // Update user
-    await prisma.user.update({
-      where: { id: vcard.userId },
-      data: {
-        name,
-        position,
-        email,
-        phone,
-        photoUrl,
-        website,
-        branchId,
-      },
-    });
+    if (companyId && selectedBranch.companyId !== companyId) {
+      return NextResponse.json(
+        { error: 'La sucursal seleccionada no pertenece a la empresa indicada' },
+        { status: 400 }
+      );
+    }
 
-    // Keep vCard tied to the selected existing branch.
-    await prisma.vCard.update({
-      where: { id: params.id },
-      data: {
-        branchId: selectedBranch.id,
-        updatedAt: new Date(),
-      },
-    });
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: vcard.userId },
+        data: { name: String(name).trim(), position, email: normalizedEmail, phone, photoUrl, website, branchId },
+      }),
+      prisma.vCard.update({
+        where: { id: params.id },
+        data: { branchId: selectedBranch.id, updatedAt: new Date() },
+      }),
+    ]);
 
     const updatedVCard = await prisma.vCard.findUnique({
       where: { id: params.id },

@@ -102,10 +102,11 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const {
-      name, email, position, phone, website, photoUrl, branchId
+      name, email, position, phone, website, photoUrl, branchId, companyId
     } = body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
-    if (!name || !email || !branchId) {
+    if (!name || !normalizedEmail || !branchId) {
       return NextResponse.json({ error: 'Faltan datos requeridos (nombre, email, sucursal)' }, { status: 400 });
     }
 
@@ -113,55 +114,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // 1. Find or Create the Advisor User
-    let user = await prisma.user.findUnique({
-      where: { email }
+    const selectedBranch = await prisma.branch.findUnique({
+      where: { id: branchId },
+      select: { id: true, companyId: true },
     });
 
-    if (!user) {
-      const generatedPassword = randomBytes(24).toString('hex');
-      const hashedPassword = await bcrypt.hash(generatedPassword, 12);
-
-      // Create a default advisor user
-      user = await prisma.user.create({
-        data: {
-          email,
-          name,
-          password: hashedPassword,
-          role: 'ADVISOR',
-          isSystemUser: false,
-          position,
-          phone,
-          website,
-          photoUrl,
-          branchId,
-          isActive: true
-        }
-      });
-    } else {
-      // Update existing advisor info if needed
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          name,
-          position,
-          phone,
-          website,
-          photoUrl,
-          branchId
-        }
-      });
+    if (!selectedBranch) {
+      return NextResponse.json({ error: 'Sucursal no encontrada' }, { status: 404 });
     }
 
-    const userId = user.id;
-
-    // 2. Check for existing vCard
-    const existingVCard = await prisma.vCard.findFirst({
-      where: { userId, branchId }
-    });
-
-    if (existingVCard) {
-      return NextResponse.json({ error: 'El usuario ya tiene una vCard en esta sucursal' }, { status: 400 });
+    if (companyId && selectedBranch.companyId !== companyId) {
+      return NextResponse.json(
+        { error: 'La sucursal seleccionada no pertenece a la empresa indicada' },
+        { status: 400 }
+      );
     }
 
     const qrCodeData = uuidv4();
@@ -185,21 +151,59 @@ export async function POST(request: Request) {
       }
     });
 
-    const vcard = await prisma.vCard.create({
-      data: {
-        userId,
-        branchId,
-        qrCodeData,
-        qrImageUrl,
-        isActive: true
+    const generatedPassword = randomBytes(24).toString('hex');
+    const hashedPassword = await bcrypt.hash(generatedPassword, 12);
+
+    const vcard = await prisma.$transaction(async (tx) => {
+      let user = await tx.user.findUnique({ where: { email: normalizedEmail } });
+
+      if (!user) {
+        user = await tx.user.create({
+          data: {
+            email: normalizedEmail,
+            name: String(name).trim(),
+            password: hashedPassword,
+            role: 'ADVISOR',
+            isSystemUser: false,
+            position,
+            phone,
+            website,
+            photoUrl,
+            branchId,
+            isActive: true,
+          },
+        });
+      } else {
+        const existingVCard = await tx.vCard.findFirst({
+          where: { userId: user.id, branchId },
+          select: { id: true },
+        });
+        if (existingVCard) {
+          throw new Error('VCARD_ALREADY_EXISTS');
+        }
+
+        user = await tx.user.update({
+          where: { id: user.id },
+          data: { name: String(name).trim(), position, phone, website, photoUrl, branchId },
+        });
       }
+
+      return tx.vCard.create({
+        data: { userId: user.id, branchId, qrCodeData, qrImageUrl, isActive: true },
+      });
     });
 
     // ISO 27001 Audit
-    await createAuditLog('CREATED', 'VCard', vcard.id, { qrId: qrCodeData, advisorEmail: email }, request);
+    await createAuditLog('CREATED', 'VCard', vcard.id, { qrId: qrCodeData, advisorEmail: normalizedEmail }, request);
 
     return NextResponse.json(vcard, { status: 201 });
   } catch (error) {
+    if (error instanceof Error && error.message === 'VCARD_ALREADY_EXISTS') {
+      return NextResponse.json(
+        { error: 'El usuario ya tiene una vCard en esta sucursal' },
+        { status: 409 }
+      );
+    }
     console.error('Error creando vCard:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
