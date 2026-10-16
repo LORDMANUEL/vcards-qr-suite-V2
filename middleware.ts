@@ -34,6 +34,24 @@ function hasSessionCookie(req: NextRequest): boolean {
   );
 }
 
+function buildRequestUrl(req: NextRequest, pathname: string): URL {
+  const url = req.nextUrl.clone();
+  const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+  const hostHeader = forwardedHost || req.headers.get('host') || '';
+  const safeHost = /^[a-z0-9.-]+(?::\d{1,5})?$/i.test(hostHeader) ? hostHeader : '';
+  const forwardedProto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const protocol = forwardedProto === 'https' ? 'https:' : forwardedProto === 'http' ? 'http:' : url.protocol;
+
+  if (safeHost) {
+    url.protocol = protocol;
+    url.host = safeHost;
+  }
+  url.pathname = pathname;
+  url.search = '';
+  url.hash = '';
+  return url;
+}
+
 function isRepeatedHostPath(pathname: string, hostCandidates: string[]): boolean {
   const segments = pathname
     .split('/')
@@ -80,9 +98,9 @@ export function middleware(req: NextRequest) {
 
     if (matchesPathPrefix(pathname, RETIRED_CAPTIVE_UI_PATHS)) {
       if (hasSessionCookie(req)) {
-        return NextResponse.redirect(new URL('/portales', req.url));
+        return NextResponse.redirect(buildRequestUrl(req, '/portales'));
       }
-      return NextResponse.redirect(new URL('/login', req.url));
+      return NextResponse.redirect(buildRequestUrl(req, '/login'));
     }
   }
 
@@ -91,7 +109,7 @@ export function middleware(req: NextRequest) {
   }
 
   if (!isPublicUiPath(pathname) && !hasSessionCookie(req)) {
-    const loginUrl = new URL('/login', req.url);
+    const loginUrl = buildRequestUrl(req, '/login');
     if (pathname !== '/') loginUrl.searchParams.set('callbackUrl', `${pathname}${search}`);
     return NextResponse.redirect(loginUrl);
   }
@@ -99,7 +117,7 @@ export function middleware(req: NextRequest) {
   // Entrada exclusiva del panel VCards.
   if (req.nextUrl.pathname === '/') {
     return NextResponse.redirect(
-      new URL('/vcards', req.url)
+      buildRequestUrl(req, '/vcards')
     );
   }
 
