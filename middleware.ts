@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  RETIRED_CAPTIVE_API_PREFIXES,
+  RETIRED_CAPTIVE_UI_PATHS,
+  isVcardsOnlyMode,
+  matchesPathPrefix,
+} from './lib/runtime-mode';
 
 const ipPortPattern = /\b\d{1,3}(?:\.\d{1,3}){3}:\d{2,5}\b/;
 const ipv4Pattern = /^\d{1,3}(?:\.\d{1,3}){3}$/;
@@ -61,6 +67,28 @@ function hasMalformedPath(pathname: string): boolean {
 }
 
 export function middleware(req: NextRequest) {
+  const { pathname, search } = req.nextUrl;
+
+  if (isVcardsOnlyMode()) {
+    if (matchesPathPrefix(pathname, RETIRED_CAPTIVE_API_PREFIXES)) {
+      return NextResponse.json(
+        { error: 'El portal cautivo se administra en un nodo independiente.' },
+        { status: 410 }
+      );
+    }
+
+    if (matchesPathPrefix(pathname, RETIRED_CAPTIVE_UI_PATHS)) {
+      if (hasSessionCookie(req)) {
+        return NextResponse.redirect(new URL('/portales', req.url));
+      }
+      return NextResponse.redirect(new URL('/login', req.url));
+    }
+  }
+
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next();
+  }
+
   // Entrada exclusiva del panel VCards.
   if (req.nextUrl.pathname === '/') {
     return NextResponse.redirect(
@@ -68,7 +96,6 @@ export function middleware(req: NextRequest) {
     );
   }
 
-  const { pathname, search } = req.nextUrl;
   const canonicalHost = getCanonicalPortalHost();
   const hostHeader = req.headers.get('host') || '';
   const reqHost = (hostHeader.includes(':') ? hostHeader.split(':')[0] : hostHeader).toLowerCase() || req.nextUrl.hostname.toLowerCase();
@@ -148,6 +175,6 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|robots.txt).*)',
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt).*)',
   ],
 };

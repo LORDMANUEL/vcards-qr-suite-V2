@@ -16,6 +16,10 @@ export function canManageSystemUsers(role: string | undefined | null) {
   return hasRole(role, ['ADMIN', 'IT', 'SUPER_ADMIN']);
 }
 
+export function canViewAuditLogs(role: string | undefined | null) {
+  return hasRole(role, ['ADMIN', 'IT', 'SUPER_ADMIN']);
+}
+
 export function canViewVcards(role: string | undefined | null) {
   return hasRole(role, SYSTEM_ROLES);
 }

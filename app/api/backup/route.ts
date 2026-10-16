@@ -6,14 +6,13 @@ import { exec } from 'child_process';
 import util from 'util';
 import path from 'path';
 import fs from 'fs';
-import { prisma } from '@/lib/prisma';
 
 const execPromise = util.promisify(exec);
 
 export async function GET() {
     try {
         const session = await getServerSession(authOptions);
-        if (!session || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'ADMIN')) {
+        if (!session || session.user.role !== 'SUPER_ADMIN') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
@@ -26,14 +25,14 @@ export async function GET() {
         const files = await fs.promises.readdir(backupDir);
         const backupFiles = await Promise.all(
             files
-                .filter(f => f.endsWith('.sql') || f.endsWith('.json'))
+                .filter(f => f.endsWith('.sql'))
                 .map(async (f) => {
                     const stats = await fs.promises.stat(path.join(backupDir, f));
                     return {
                         name: f,
                         size: stats.size,
                         createdAt: stats.birthtime,
-                        format: f.endsWith('.json') ? 'json' : 'sql'
+                        format: 'sql'
                     };
                 })
         );
@@ -69,95 +68,18 @@ export async function POST() {
                 // We use the full URL directly which pg_dump supports via the -d flag or just positional.
                 // To avoid password prompt, we can use the URL format.
                 await execPromise(`pg_dump "${dbUrl}" -f "${filePath}"`);
-            } catch (dumpError: any) {
-                console.error('pg_dump failed, falling back to dummy file:', dumpError);
-                const jsonName = `backup-${timestamp}.json`;
-                const jsonPath = path.join(backupDir, jsonName);
-                const backupPayload = {
-                    generatedAt: new Date().toISOString(),
-                    source: 'fallback-json',
-                    reason: dumpError.message || 'pg_dump failed',
-                    datasets: {
-                        companies: await prisma.company.findMany(),
-                        branches: await prisma.branch.findMany(),
-                        users: await prisma.user.findMany({
-                            select: {
-                                id: true,
-                                email: true,
-                                name: true,
-                                role: true,
-                                position: true,
-                                phone: true,
-                                photoUrl: true,
-                                website: true,
-                                branchId: true,
-                                isActive: true,
-                                createdAt: true,
-                                updatedAt: true,
-                            }
-                        }),
-                        themes: await prisma.theme.findMany(),
-                        vcards: await prisma.vCard.findMany({
-                            include: {
-                                scans: true,
-                            }
-                        }),
-                        accessPoints: await prisma.accessPoint.findMany(),
-                        portalSessions: await prisma.portalSession.findMany(),
-                    }
-                };
-                await fs.promises.writeFile(jsonPath, JSON.stringify(backupPayload, null, 2), 'utf-8');
-                return NextResponse.json({
-                    message: 'Backup creado con fallback JSON (pg_dump no disponible)',
-                    fileName: jsonName,
-                    format: 'json',
-                    size: (await fs.promises.stat(jsonPath)).size,
-                    warning: dumpError.message || 'pg_dump failed',
-                });
+            } catch (dumpError) {
+                console.error('pg_dump failed:', dumpError);
+                return NextResponse.json(
+                    { error: 'No se pudo crear un respaldo PostgreSQL verificable.' },
+                    { status: 503 }
+                );
             }
         } else {
-            const jsonName = `backup-${timestamp}.json`;
-            const jsonPath = path.join(backupDir, jsonName);
-            const backupPayload = {
-                generatedAt: new Date().toISOString(),
-                source: 'fallback-json',
-                reason: 'DATABASE_URL not recognized for pg_dump',
-                datasets: {
-                    companies: await prisma.company.findMany(),
-                    branches: await prisma.branch.findMany(),
-                    users: await prisma.user.findMany({
-                        select: {
-                            id: true,
-                            email: true,
-                            name: true,
-                            role: true,
-                            position: true,
-                            phone: true,
-                            photoUrl: true,
-                            website: true,
-                            branchId: true,
-                            isActive: true,
-                            createdAt: true,
-                            updatedAt: true,
-                        }
-                    }),
-                    themes: await prisma.theme.findMany(),
-                    vcards: await prisma.vCard.findMany({
-                        include: {
-                            scans: true,
-                        }
-                    }),
-                    accessPoints: await prisma.accessPoint.findMany(),
-                    portalSessions: await prisma.portalSession.findMany(),
-                }
-            };
-            await fs.promises.writeFile(jsonPath, JSON.stringify(backupPayload, null, 2), 'utf-8');
-            return NextResponse.json({
-                message: 'Backup creado en formato JSON (pg_dump no configurado)',
-                fileName: jsonName,
-                format: 'json',
-                size: (await fs.promises.stat(jsonPath)).size,
-            });
+            return NextResponse.json(
+                { error: 'DATABASE_URL no está configurada para un respaldo PostgreSQL.' },
+                { status: 503 }
+            );
         }
 
         return NextResponse.json({

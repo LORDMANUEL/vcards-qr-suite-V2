@@ -8,7 +8,7 @@ import fs from 'fs';
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        if (!session || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'ADMIN')) {
+        if (!session || session.user.role !== 'SUPER_ADMIN') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
@@ -27,7 +27,7 @@ export async function GET(req: Request) {
         const backupDir = path.join(process.cwd(), 'backups');
         const filePath = path.join(backupDir, fileName);
 
-        if (!(fileName.endsWith('.sql') || fileName.endsWith('.json'))) {
+        if (!fileName.endsWith('.sql')) {
             return NextResponse.json({ error: 'Invalid backup format' }, { status: 400 });
         }
 
@@ -36,7 +36,7 @@ export async function GET(req: Request) {
         }
 
         const fileBuffer = await fs.promises.readFile(filePath);
-        const contentType = fileName.endsWith('.json') ? 'application/json' : 'application/sql';
+        const contentType = 'application/sql';
         
         return new NextResponse(new Uint8Array(fileBuffer), {
             headers: {
