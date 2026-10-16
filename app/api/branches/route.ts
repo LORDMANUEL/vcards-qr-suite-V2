@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { canManageCompanies, canViewVcards } from '@/lib/permissions';
 
 export async function GET(req: Request) {
   try {
@@ -11,7 +12,16 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const canManageAny = canManageCompanies(String(session.user.role));
+    if (!canManageAny && !canViewVcards(String(session.user.role))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    if (!canManageAny && !session.user.branchId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const branches = await prisma.branch.findMany({
+      where: canManageAny ? undefined : { id: session.user.branchId! },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
       include: {
         _count: {
@@ -49,6 +59,9 @@ export async function POST(req: Request) {
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    if (!canManageCompanies(String(session.user.role))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const body = await req.json();
     const {
@@ -67,14 +80,19 @@ export async function POST(req: Request) {
 
     if (companyId) {
       const company = await prisma.company.findUnique({ where: { id: companyId } });
-      if (company) {
-        resolvedCompanyName = resolvedCompanyName || company.name;
-        resolvedThemeId = resolvedThemeId || company.defaultVcardThemeId || null;
-        resolvedSeasonalThemeId = resolvedSeasonalThemeId || company.seasonalVcardThemeId || null;
-        resolvedPrimaryColor = primaryColor || company.primaryColor;
-        resolvedSecondaryColor = secondaryColor || company.secondaryColor;
-        resolvedLogoUrl = logoUrl || company.logoUrl;
+      if (!company) {
+        return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
       }
+      resolvedCompanyName = company.name;
+      resolvedThemeId = resolvedThemeId || company.defaultVcardThemeId || null;
+      resolvedSeasonalThemeId = resolvedSeasonalThemeId || company.seasonalVcardThemeId || null;
+      resolvedPrimaryColor = primaryColor || company.primaryColor;
+      resolvedSecondaryColor = secondaryColor || company.secondaryColor;
+      resolvedLogoUrl = logoUrl || company.logoUrl;
+    }
+
+    if (!name || !String(name).trim()) {
+      return NextResponse.json({ error: 'Nombre de sucursal requerido' }, { status: 400 });
     }
 
     const lastBranch = await prisma.branch.findFirst({

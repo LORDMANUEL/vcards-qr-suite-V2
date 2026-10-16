@@ -27,7 +27,13 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const { password: _, ...safeUser } = user;
+        const {
+            password: _,
+            resetPasswordToken: _resetToken,
+            resetPasswordExpires: _resetExpires,
+            twoFactorSecret: _twoFactorSecret,
+            ...safeUser
+        } = user;
         return NextResponse.json({ user: safeUser });
     } catch (error) {
         console.error('Error fetching user:', error);
@@ -54,6 +60,16 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
         if (!existingUser) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        if (role === 'SUPER_ADMIN' && session.user.role !== 'SUPER_ADMIN') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+        if (existingUser.role === 'SUPER_ADMIN' && session.user.role !== 'SUPER_ADMIN') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+        if (isSystemUser === false && role && role !== 'ADVISOR') {
+            return NextResponse.json({ error: 'Los contactos vCard deben usar el rol ADVISOR' }, { status: 400 });
         }
 
         const dataToUpdate: any = {
@@ -89,7 +105,13 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
             }
         });
 
-        const { password: _, ...safeUser } = user;
+        const {
+            password: _,
+            resetPasswordToken: _resetToken,
+            resetPasswordExpires: _resetExpires,
+            twoFactorSecret: _twoFactorSecret,
+            ...safeUser
+        } = user;
         return NextResponse.json({ user: safeUser });
     } catch (error) {
         console.error('Error updating user:', error);
@@ -114,6 +136,13 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 
         if (!existingUser) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        if (params.id === session.user.id) {
+            return NextResponse.json({ error: 'No puedes eliminar tu propia cuenta' }, { status: 409 });
+        }
+        if (existingUser.role === 'SUPER_ADMIN' && session.user.role !== 'SUPER_ADMIN') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         await prisma.user.delete({

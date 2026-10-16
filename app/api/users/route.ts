@@ -13,7 +13,10 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
         const { searchParams } = new URL(req.url);
-        const kind = searchParams.get('kind') || 'all';
+        const kind = searchParams.get('kind') || 'vcard';
+        if (!['system', 'vcard'].includes(kind)) {
+            return NextResponse.json({ error: 'Invalid user kind' }, { status: 400 });
+        }
         if (kind === 'system' && !canManageSystemUsers(String(session.user.role))) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
@@ -21,8 +24,17 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
+        const canManageAll = canManageSystemUsers(String(session.user.role));
+        const scopedBranchId = !canManageAll ? session.user.branchId : undefined;
+        if (!canManageAll && !scopedBranchId) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
         const users = await prisma.user.findMany({
-            where: kind === 'system' ? { isSystemUser: true } : kind === 'vcard' ? { isSystemUser: false } : undefined,
+            where: {
+                isSystemUser: kind === 'system',
+                ...(scopedBranchId ? { branchId: scopedBranchId } : {}),
+            },
             orderBy: { createdAt: 'desc' },
             include: {
                 branch: {
@@ -36,7 +48,13 @@ export async function GET(req: Request) {
 
         // Strip sensitive info like passwords
         const safeUsers = users.map((user: any) => {
-            const { password, ...safeUser } = user;
+            const {
+                password,
+                resetPasswordToken,
+                resetPasswordExpires,
+                twoFactorSecret,
+                ...safeUser
+            } = user;
             return safeUser;
         });
 
@@ -76,6 +94,17 @@ export async function POST(req: Request) {
         }
 
         const finalIsSystemUser = isSystemUser !== false;
+        const requestedRole = String(role || (finalIsSystemUser ? 'SAC' : 'ADVISOR'));
+        const allowedRoles = ['ADMIN', 'IT', 'MARKETING', 'MARKETING_MANAGER', 'SAC', 'SALES_MANAGER', 'SUPER_ADMIN', 'ADVISOR'];
+        if (!allowedRoles.includes(requestedRole)) {
+            return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
+        }
+        if (!finalIsSystemUser && requestedRole !== 'ADVISOR') {
+            return NextResponse.json({ error: 'Los contactos vCard deben usar el rol ADVISOR' }, { status: 400 });
+        }
+        if (requestedRole === 'SUPER_ADMIN' && session.user.role !== 'SUPER_ADMIN') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
         const rawPassword = password || Math.random().toString(36).slice(2, 12);
         const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
@@ -84,7 +113,7 @@ export async function POST(req: Request) {
                 name,
                 email,
                 password: hashedPassword,
-                role: role || 'ADVISOR',
+                role: requestedRole as any,
                 isSystemUser: finalIsSystemUser,
                 position,
                 phone,
@@ -106,7 +135,13 @@ export async function POST(req: Request) {
             }
         });
 
-        const { password: _, ...safeUser } = user;
+        const {
+            password: _,
+            resetPasswordToken: _resetToken,
+            resetPasswordExpires: _resetExpires,
+            twoFactorSecret: _twoFactorSecret,
+            ...safeUser
+        } = user;
         return NextResponse.json({ user: safeUser }, { status: 201 });
     } catch (error) {
         console.error('Error creating user:', error);
