@@ -56,3 +56,13 @@ export function isSafePublicUrl(value: string) {
     return false;
   }
 }
+
+export function isSafeEmbedUrl(value?: string | null) {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return ['https:', 'http:'].includes(url.protocol);
+  } catch {
+    return false;
+  }
+}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildMailto, detectVCardBrand, getPositionGroup, isSafePublicUrl } from '../lib/vcard-profile';
+import { buildMailto, detectVCardBrand, getPositionGroup, isSafeEmbedUrl, isSafePublicUrl } from '../lib/vcard-profile';
 
 test('detects the three supported brands without assigning unknown companies to Ford', () => {
   assert.equal(detectVCardBrand('Ford Yude'), 'ford');
@@ -28,4 +28,12 @@ test('rejects executable and data URLs', () => {
   assert.equal(isSafePublicUrl('tel:+50422223333'), true);
   assert.equal(isSafePublicUrl('javascript:alert(1)'), false);
   assert.equal(isSafePublicUrl('data:text/html,unsafe'), false);
+});
+
+test('only allows web URLs in embedded content', () => {
+  assert.equal(isSafeEmbedUrl('https://www.youtube.com/embed/example'), true);
+  assert.equal(isSafeEmbedUrl('http://maps.example.test/embed'), true);
+  assert.equal(isSafeEmbedUrl('javascript:alert(1)'), false);
+  assert.equal(isSafeEmbedUrl('data:text/html,<script>alert(1)</script>'), false);
+  assert.equal(isSafeEmbedUrl('mailto:test@example.com'), false);
 });

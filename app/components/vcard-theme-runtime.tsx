@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Calendar, Car, Download, ExternalLink, Globe, Mail, MapPin, MessageSquare, Phone, Share2, Star } from 'lucide-react';
+import { isSafeEmbedUrl, isSafePublicUrl } from '@/lib/vcard-profile';
 
 export interface RuntimeProfile {
   fullName: string;
@@ -384,9 +385,9 @@ export function renderVCardLayout({ layout, profile, handlers }: { layout: any[]
       return (
         <div key={block.id} className="px-5 py-4">
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-black/5" style={{ height: p.height || 220 }}>
-            {p.embedType === 'iframe' ? (
-              <iframe src={p.embedUrl} title={p.title || 'Embed widget'} className="h-full w-full border-0" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
-            ) : p.embedType === 'video' ? (
+            {p.embedType === 'iframe' && isSafeEmbedUrl(p.embedUrl) ? (
+              <iframe src={p.embedUrl} title={p.title || 'Embed widget'} className="h-full w-full border-0" sandbox="allow-scripts allow-same-origin allow-presentation" allow="encrypted-media; picture-in-picture" allowFullScreen referrerPolicy="no-referrer" />
+            ) : p.embedType === 'video' && isSafeEmbedUrl(p.embedUrl) ? (
               <video src={p.embedUrl} className="h-full w-full object-cover" autoPlay={p.autoplay !== false} muted={p.muted !== false} loop={p.loop !== false} controls={p.controls === true} />
             ) : (
               <div className="flex h-full items-center justify-center text-sm font-bold text-gray-500">Define un embed URL valido</div>
@@ -397,9 +398,16 @@ export function renderVCardLayout({ layout, profile, handlers }: { layout: any[]
     }
 
     if (block.type === 'HTMLBlock') {
+      const srcDoc = String(p.htmlContent || '<p>HTML sin contenido</p>');
       return (
         <div key={block.id} className="px-5 py-4">
-          <div className="overflow-auto rounded-2xl border border-gray-200 bg-white p-3" dangerouslySetInnerHTML={{ __html: p.htmlContent || '<div class="text-sm text-gray-500">HTML sin contenido</div>' }} />
+          <iframe
+            title={p.title || 'Contenido personalizado'}
+            srcDoc={srcDoc}
+            sandbox=""
+            referrerPolicy="no-referrer"
+            className="min-h-32 w-full overflow-auto rounded-2xl border border-gray-200 bg-white"
+          />
         </div>
       );
     }
@@ -407,7 +415,9 @@ export function renderVCardLayout({ layout, profile, handlers }: { layout: any[]
     if (block.type === 'ProgrammableButton') {
       const handleProgrammableAction = () => {
         if (p.actionType === 'url') {
-          window.open(p.actionUrl, p.openInNewTab !== false ? '_blank' : '_self', 'noopener,noreferrer');
+          if (isSafePublicUrl(String(p.actionUrl || ''))) {
+            window.open(p.actionUrl, p.openInNewTab !== false ? '_blank' : '_self', 'noopener,noreferrer');
+          }
         } else if (p.actionType === 'tel' && p.phoneNumber) {
           window.location.href = `tel:${p.phoneNumber}`;
         } else if (p.actionType === 'email' && p.emailAddress) {
@@ -490,7 +500,7 @@ export function renderVCardLayout({ layout, profile, handlers }: { layout: any[]
               )}
               {p.ctaLabel && (
                 <button 
-                  onClick={() => p.ctaUrl && window.open(p.ctaUrl, '_blank')}
+                  onClick={() => isSafePublicUrl(String(p.ctaUrl || '')) && window.open(p.ctaUrl, '_blank', 'noopener,noreferrer')}
                   className="mt-4 rounded-lg px-4 py-2 text-sm font-bold transition-colors"
                   style={{ backgroundColor: p.ctaBgColor || '#003478', color: p.ctaTextColor || '#ffffff' }}
                 >
@@ -540,7 +550,7 @@ export function renderVCardLayout({ layout, profile, handlers }: { layout: any[]
                 const isSchedule = btn.iconType === 'calendar' || /agenda|cita/i.test(btn.label || '');
                 if (isSchedule && handlers.onSchedule) {
                   handlers.onSchedule();
-                } else if (btn.actionType === 'url' && btn.actionUrl) {
+                } else if (btn.actionType === 'url' && isSafePublicUrl(String(btn.actionUrl || ''))) {
                   window.open(btn.actionUrl, '_blank', 'noopener,noreferrer');
                 } else if (btn.actionType === 'tel' && btn.phoneNumber) {
                   window.location.href = `tel:${btn.phoneNumber}`;
@@ -582,14 +592,15 @@ export function renderVCardLayout({ layout, profile, handlers }: { layout: any[]
       return (
         <div key={block.id} className="px-5 py-4">
           <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-            {p.mapEmbedUrl ? (
+            {isSafeEmbedUrl(p.mapEmbedUrl) ? (
               <div style={{ height: p.mapHeight || 180 }} className="overflow-hidden">
                 <iframe
                   src={p.mapEmbedUrl}
                   title={p.title || 'Ubicación'}
                   className="h-full w-full border-0"
                   loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
+                  sandbox="allow-scripts allow-same-origin allow-presentation"
+                  referrerPolicy="no-referrer"
                 />
               </div>
             ) : null}
@@ -603,7 +614,7 @@ export function renderVCardLayout({ layout, profile, handlers }: { layout: any[]
               </div>
               {p.mapsUrl ? (
                 <button
-                  onClick={() => window.open(p.mapsUrl, '_blank', 'noopener,noreferrer')}
+                  onClick={() => isSafePublicUrl(String(p.mapsUrl || '')) && window.open(p.mapsUrl, '_blank', 'noopener,noreferrer')}
                   className="mt-3 flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50 active:scale-95"
                 >
                   <ExternalLink className="h-4 w-4" />
