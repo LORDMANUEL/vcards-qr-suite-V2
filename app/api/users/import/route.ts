@@ -8,7 +8,8 @@ import * as XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
 import QRCode from 'qrcode';
 import CryptoJS from 'crypto-js';
-import { canBulkImportVcards } from '@/lib/permissions';
+import { canBulkImportVcards, canManageCompanies } from '@/lib/permissions';
+import { isValidEmail } from '@/lib/auth-security';
 
 function resolvePublicBaseUrl(request: Request) {
   if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL;
@@ -39,11 +40,17 @@ export async function POST(req: Request) {
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'File is required' }, { status: 400 });
     }
+    if (file.size > 5 * 1024 * 1024) {
+      return NextResponse.json({ error: 'El archivo excede el limite de 5 MB' }, { status: 413 });
+    }
 
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json<any>(worksheet);
+    if (rows.length > 1000) {
+      return NextResponse.json({ error: 'La importacion admite un maximo de 1000 filas' }, { status: 413 });
+    }
 
     let createdUsers = 0;
     let createdVCards = 0;
@@ -54,28 +61,32 @@ export async function POST(req: Request) {
     }
 
     const baseUrl = resolvePublicBaseUrl(req);
+    const canManageAny = canManageCompanies(String(session.user.role));
 
-    for (const row of rows) {
+    for (const [rowIndex, row] of rows.entries()) {
       const email = String(row.email || '').trim().toLowerCase();
       const name = String(row.name || '').trim();
-      if (!email || !name) {
-        skipped.push(`Fila sin email o nombre: ${JSON.stringify(row)}`);
+      if (!isValidEmail(email) || !name) {
+        skipped.push(`Fila ${rowIndex + 2}: email o nombre invalido`);
         continue;
       }
 
-      const branchQuery = [
-        row.branchId ? { id: String(row.branchId) } : undefined,
-        row.branchName ? { name: String(row.branchName) } : undefined,
-        row.city ? { city: String(row.city) } : undefined,
-      ].filter(Boolean) as any[];
-
-      if (!branchQuery.length && defaultBranchId) {
-        branchQuery.push({ id: defaultBranchId });
-      }
-
-      const branch = branchQuery.length
-        ? await prisma.branch.findFirst({ where: { OR: branchQuery as any } })
-        : null;
+      const requestedBranchId = String(row.branchId || defaultBranchId || '').trim();
+      const branch = !canManageAny
+        ? session.user.branchId
+          ? await prisma.branch.findUnique({ where: { id: session.user.branchId } })
+          : null
+        : requestedBranchId
+          ? await prisma.branch.findUnique({ where: { id: requestedBranchId } })
+          : row.branchName && row.city && row.companyId
+            ? await prisma.branch.findFirst({
+                where: {
+                  name: String(row.branchName).trim(),
+                  city: String(row.city).trim(),
+                  companyId: String(row.companyId).trim(),
+                },
+              })
+            : null;
 
       if (!branch) {
         skipped.push(`Sin sucursal para ${email}`);
@@ -83,6 +94,10 @@ export async function POST(req: Request) {
       }
 
       let user = await prisma.user.findUnique({ where: { email } });
+      if (user?.isSystemUser) {
+        skipped.push(`Correo administrativo no permitido para vCard: ${email}`);
+        continue;
+      }
       if (!user) {
         const hashedPassword = await bcrypt.hash(Math.random().toString(36).slice(2, 12), 10);
         user = await prisma.user.create({

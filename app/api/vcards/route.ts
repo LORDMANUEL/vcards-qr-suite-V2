@@ -7,6 +7,7 @@ import QRCode from 'qrcode';
 import CryptoJS from 'crypto-js';
 import { createAuditLog } from '@/lib/audit';
 import { canBulkImportVcards, canManageCompanies, canViewVcards } from '@/lib/permissions';
+import { isValidEmail } from '@/lib/auth-security';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 
@@ -106,7 +107,7 @@ export async function POST(request: Request) {
     } = body;
     const normalizedEmail = String(email || '').trim().toLowerCase();
 
-    if (!name || !normalizedEmail || !branchId) {
+    if (!name || !isValidEmail(normalizedEmail) || !branchId) {
       return NextResponse.json({ error: 'Faltan datos requeridos (nombre, email, sucursal)' }, { status: 400 });
     }
 
@@ -174,8 +175,11 @@ export async function POST(request: Request) {
           },
         });
       } else {
+        if (user.isSystemUser) {
+          throw new Error('SYSTEM_USER_CONFLICT');
+        }
         const existingVCard = await tx.vCard.findFirst({
-          where: { userId: user.id, branchId },
+          where: { userId: user.id },
           select: { id: true },
         });
         if (existingVCard) {
@@ -201,6 +205,12 @@ export async function POST(request: Request) {
     if (error instanceof Error && error.message === 'VCARD_ALREADY_EXISTS') {
       return NextResponse.json(
         { error: 'El usuario ya tiene una vCard en esta sucursal' },
+        { status: 409 }
+      );
+    }
+    if (error instanceof Error && error.message === 'SYSTEM_USER_CONFLICT') {
+      return NextResponse.json(
+        { error: 'Ese correo pertenece a un usuario administrativo y no puede reutilizarse para una vCard' },
         { status: 409 }
       );
     }

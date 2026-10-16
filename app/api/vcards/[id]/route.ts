@@ -43,6 +43,10 @@ export async function PUT(
       );
     }
 
+    if (vcard.user.isSystemUser) {
+      return NextResponse.json({ error: 'La vCard esta vinculada a un usuario administrativo y requiere revision manual' }, { status: 409 });
+    }
+
     if (!canManageAny && session.user.branchId !== branchId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
