@@ -1,0 +1,621 @@
+app\internet\page.tsx:30:        await fetch('/api/public/portal-info?slug=default');
+app\internet\page.tsx:74:                <a key={link.id} href={link.url} target="_blank" rel="noreferrer" className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 text-sm font-bold text-slate-700 transition hover:border-[#003478] hover:bg-white">
+app\internet\page.tsx:87:                <a key={banner.id} href={banner.targetUrl || '#'} target="_blank" rel="noreferrer" className="overflow-hidden rounded-3xl bg-white shadow-sm">
+app\internet\page.tsx:104:                  {promo.targetUrl ? <a href={promo.targetUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex rounded-2xl bg-[#003478] px-4 py-2 text-sm font-bold text-white">Ver promocion</a> : null}
+app\api\analytics\route.ts:3:import { getServerSession } from 'next-auth';
+app\api\analytics\route.ts:7:import { canManageCompanies, canViewVcards } from '@/lib/permissions';
+app\api\analytics\route.ts:11:        const session = await getServerSession(authOptions);
+app\api\analytics\route.ts:16:        const role = String(session.user.role);
+app\api\analytics\route.ts:17:        if (!canViewVcards(role)) {
+app\api\analytics\route.ts:18:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\analytics\route.ts:21:        const scopedBranchId = !canManageCompanies(role) ? session.user.branchId : undefined;
+app\api\analytics\route.ts:22:        if (!canManageCompanies(role) && !scopedBranchId) {
+app\api\analytics\route.ts:23:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\dashboard\page.tsx:65:      const res = await fetch('/api/dashboard');
+app\banners\page.tsx:45:      const res = await fetch('/api/banners');
+app\logs\page.tsx:20:    role: string;
+app\logs\page.tsx:36:      if (!['ADMIN', 'IT'].includes(session?.user?.role || '')) {
+app\logs\page.tsx:57:      const res = await fetch('/api/logs?limit=300'); // Let's keep recent memory for UI speed
+app\logs\page.tsx:100:              <p>Este tablero es inmutable. Registra cualquier alteración en el sistema para garantizar la trazabilidad según los lineamientos de la ISO 27001/9001. Las modificaciones a las VCards, roles de usuario, o esquemas, quedarán permanently marcados con la Autoridad (Usuario) en curso y la IP Origen.</p>
+app\logs\page.tsx:154:                            <div className="text-[10px] text-gray-500 mt-1 uppercase tracking-widest">{log.user.role}</div>
+app\editor\page.tsx:55:      const response = await fetch('/api/themes', {
+app\configuracion\portales\page.tsx:59:            const res = await fetch('/api/branches');
+app\configuracion\portales\page.tsx:109:            const res = await fetch('/api/portal-config', {
+app\backup\page.tsx:14:      const res = await fetch('/api/backup');
+app\backup\page.tsx:31:      const res = await fetch('/api/backup', { method: 'POST' });
+app\backup\page.tsx:121:                          href={`/api/backup/download?file=${b.name}`}
+app\configuraciones\page.tsx:68:      const res = await fetch('/api/branches');
+app\configuraciones\page.tsx:92:      const res = await fetch('/api/admin/smtp/status');
+app\configuraciones\page.tsx:120:  if (!['ADMIN', 'IT', 'SUPER_ADMIN', 'MARKETING', 'MARKETING_MANAGER'].includes(session?.user?.role || '')) {
+app\configuraciones\page.tsx:142:      const res = await fetch('/api/admin/install-ssl', {
+app\configuraciones\page.tsx:156:      await fetch('/api/portal-config', {
+app\configuraciones\page.tsx:170:      const res = await fetch('/api/admin/smtp/send-it-invites', { method: 'POST' });
+app\configuraciones\page.tsx:236:              {['ADMIN', 'IT', 'SUPER_ADMIN'].includes(session?.user?.role || '') && (
+app\configuraciones\page.tsx:266:              {['ADMIN', 'IT', 'SUPER_ADMIN'].includes(session?.user?.role || '') && (
+app\api\access-points\route.ts:3:import { getServerSession } from 'next-auth';
+app\api\access-points\route.ts:8:  const session = await getServerSession(authOptions);
+app\api\access-points\route.ts:72:  const session = await getServerSession(authOptions);
+app\api\access-points\[id]\route.ts:3:import { getServerSession } from 'next-auth';
+app\api\access-points\[id]\route.ts:8:  const session = await getServerSession(authOptions);
+app\api\access-points\[id]\route.ts:49:  const session = await getServerSession(authOptions);
+app\portales\sucursales\page.tsx:32:      fetch('/api/branches').then((r) => r.json()),
+app\portales\sucursales\page.tsx:33:      fetch('/api/access-points').then((r) => r.json()),
+app\links\page.tsx:648:            fetch('/api/branches').then(r => r.json()),
+app\links\page.tsx:649:            fetch('/api/themes?category=PORTAL').then(r => r.json()),
+app\links\page.tsx:650:            fetch('/api/access-points').then(r => r.ok ? r.json() : { accessPoints: [] }),
+app\links\page.tsx:664:            const updated = await fetch('/api/access-points').then(r => r.json());
+app\links\page.tsx:793:                                                <button onClick={() => window.open(`${BASE_URL}/portal?branchId=${ap.branchId}&ap=${ap.identifier}&mac=AA:BB:CC:DD:EE:FF&ip=192.168.1.20`, '_blank')}
+app\marketing\page.tsx:40:                fetch('/api/promotions'),
+app\marketing\page.tsx:41:                fetch('/api/banners')
+app\api\access-points\[id]\test\route.ts:3:import { getServerSession } from 'next-auth';
+app\api\access-points\[id]\test\route.ts:9:  const session = await getServerSession(authOptions);
+app\login\page.tsx:130:            <a href="/login/forgot-password" className={styles.linkBtn}>Olvide mi contrasena</a>
+app\portal\page.tsx:48:    const response = await fetch('/api/portal/register', {
+app\portal\page.tsx:207:      const response = await fetch('/api/portal/register', {
+app\portal\page.tsx:303:            <a key={promo.id} href={promo.targetUrl || '#'} target="_blank" rel="noreferrer" className="rounded-3xl bg-white/90 p-4 text-slate-800 transition hover:bg-white">
+app\portal\page.tsx:321:            <a key={link.id} href={link.url} target="_blank" rel="noreferrer" className="rounded-2xl bg-white/90 px-4 py-4 text-sm font-bold text-slate-700 transition hover:bg-white">
+app\api\admin\smtp\status\route.ts:2:import { getServerSession } from 'next-auth';
+app\api\admin\smtp\status\route.ts:4:import { canManageSystemUsers } from '@/lib/permissions';
+app\api\admin\smtp\status\route.ts:9:  const session = await getServerSession(authOptions);
+app\api\admin\smtp\status\route.ts:10:  if (!session?.user || !canManageSystemUsers(String(session.user.role))) {
+app\api\admin\smtp\status\route.ts:11:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\vcards\[id]\route.ts:2:import { getServerSession } from 'next-auth';
+app/api\vcards\[id]\route.ts:5:import { canManageCompanies } from '@/lib/permissions';
+app/api\vcards\[id]\route.ts:14:    const session = await getServerSession(authOptions);
+app/api\vcards\[id]\route.ts:17:      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+app/api\vcards\[id]\route.ts:20:    const role = String(session.user.role);
+app/api\vcards\[id]\route.ts:21:    const canManageAny = canManageCompanies(role);
+app/api\vcards\[id]\route.ts:46:    if (!canManageAny && session.user.branchId !== branchId) {
+app/api\vcards\[id]\route.ts:47:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\vcards\[id]\route.ts:115:    const session = await getServerSession(authOptions);
+app/api\vcards\[id]\route.ts:118:      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+app/api\vcards\[id]\route.ts:121:    if (!canManageCompanies(String(session.user.role))) {
+app/api\vcards\[id]\route.ts:122:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\admin\install-ssl\route.ts:3:import { getServerSession } from 'next-auth';
+app\api\admin\install-ssl\route.ts:12:        const session = await getServerSession(authOptions);
+app\api\admin\install-ssl\route.ts:13:        if (!session || !session.user || session.user.role !== 'SUPER_ADMIN') {
+app\api\admin\smtp\send-it-invites\route.ts:2:import { getServerSession } from 'next-auth';
+app\api\admin\smtp\send-it-invites\route.ts:5:import { canManageSystemUsers } from '@/lib/permissions';
+app\api\admin\smtp\send-it-invites\route.ts:11:  const session = await getServerSession(authOptions);
+app\api\admin\smtp\send-it-invites\route.ts:12:  if (!session?.user || !canManageSystemUsers(String(session.user.role))) {
+app\api\admin\smtp\send-it-invites\route.ts:13:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\admin\smtp\send-it-invites\route.ts:40:        html: `<p>Hola <b>${user.name}</b>,</p><p>Tu acceso de prueba a la plataforma vCard ya esta listo.</p><p><a href="${appUrl}/login">Ingresar a la plataforma</a></p><p>Por seguridad, cambia tu contrasena inmediatamente despues de entrar.</p><p>Usuario: <b>${user.email}</b></p>`,
+app\login\reset-password\page.tsx:34:      const res = await fetch('/api/auth/reset-password', {
+app\login\reset-password\page.tsx:95:        <a href="/login" className="mt-4 inline-block text-sm font-semibold text-blue-700 hover:underline">Ir a login</a>
+app\login\forgot-password\page.tsx:18:      const res = await fetch('/api/auth/forgot-password', {
+app\login\forgot-password\page.tsx:68:        <a href="/login" className="mt-4 inline-block text-sm font-semibold text-blue-700 hover:underline">Volver a login</a>
+app\api\logs\route.ts:4:import { getServerSession } from 'next-auth';
+app\api\logs\route.ts:9:        const session = await getServerSession(authOptions);
+app\api\logs\route.ts:14:        // Role check - Only Super Admins and local Admins can see logs (based on your structure, let's limit to SUPER_ADMIN)
+app\api\logs\route.ts:15:        if (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'ADMIN_AGENCIA') {
+app\api\logs\route.ts:16:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\logs\route.ts:31:            select: { id: true, name: true, role: true }
+app\api\logs\route.ts:38:            user: userMap.get(log.userId) || { name: 'Usuario Eliminado', role: 'Desconocido' }
+app\vcards\theme-builder\page.tsx:729:            <div dangerouslySetInnerHTML={{ __html: el.htmlContent }} />
+app\vcards\theme-builder\page.tsx:1097:      const res = await fetch('/api/vcard-themes');
+app\vcards\theme-builder\page.tsx:1430:        res = await fetch('/api/vcard-themes', {
+app\vcards\theme-builder\page.tsx:1436:        res = await fetch('/api/vcard-themes', {
+app\vcards\theme-builder\page.tsx:1953:              href={editingThemeId ? `/vcards/theme-builder?themeId=${editingThemeId}` : '/vcards/theme-builder'}
+app\api\signup\route.ts:5:import { getServerSession } from 'next-auth';
+app\api\signup\route.ts:7:import { canManageSystemUsers } from '@/lib/permissions';
+app\api\signup\route.ts:13:    const session = await getServerSession(authOptions);
+app\api\signup\route.ts:17:    if (!canManageSystemUsers(String(session.user.role))) {
+app\api\signup\route.ts:18:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\signup\route.ts:52:        role: 'ADVISOR', // Default role for testing
+app/api\vcards\scans\route.ts:4:import { getServerSession } from 'next-auth';
+app/api\vcards\scans\route.ts:94:  const session = await getServerSession(authOptions);
+app/api\vcards\scans\route.ts:95:  if (!session?.user || !canViewVcards(session.user.role)) {
+app\components\vcard-theme-runtime.tsx:402:          <div className="overflow-auto rounded-2xl border border-gray-200 bg-white p-3" dangerouslySetInnerHTML={{ __html: p.htmlContent || '<div class="text-sm text-gray-500">HTML sin contenido</div>' }} />
+app\components\vcard-theme-runtime.tsx:410:          window.open(p.actionUrl, p.openInNewTab !== false ? '_blank' : '_self', 'noopener,noreferrer');
+app\components\vcard-theme-runtime.tsx:417:          window.open(`https://wa.me/${p.whatsappNumber.replace(/\D/g, '')}?text=${message}`, '_blank');
+app\components\vcard-theme-runtime.tsx:493:                  onClick={() => p.ctaUrl && window.open(p.ctaUrl, '_blank')}
+app\components\vcard-theme-runtime.tsx:544:                  window.open(btn.actionUrl, '_blank', 'noopener,noreferrer');
+app\components\vcard-theme-runtime.tsx:549:                  window.open(`https://wa.me/${btn.whatsappNumber.replace(/\D/g, '')}?text=${msg}`, '_blank', 'noopener,noreferrer');
+app\components\vcard-theme-runtime.tsx:606:                  onClick={() => window.open(p.mapsUrl, '_blank', 'noopener,noreferrer')}
+app/api\vcards\route.ts:2:import { getServerSession } from 'next-auth';
+app/api\vcards\route.ts:9:import { canBulkImportVcards, canManageCompanies, canViewVcards } from '@/lib/permissions';
+app/api\vcards\route.ts:29:    const session = await getServerSession(authOptions);
+app/api\vcards\route.ts:32:      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+app/api\vcards\route.ts:35:    const role = String(session.user.role);
+app/api\vcards\route.ts:36:    if (!canViewVcards(role)) {
+app/api\vcards\route.ts:37:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\vcards\route.ts:40:    const whereClause = canManageCompanies(role)
+app/api\vcards\route.ts:47:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\vcards\route.ts:92:    const session = await getServerSession(authOptions);
+app/api\vcards\route.ts:95:      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+app/api\vcards\route.ts:98:    const role = String(session.user.role);
+app/api\vcards\route.ts:99:    if (!canBulkImportVcards(role)) {
+app/api\vcards\route.ts:100:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\vcards\route.ts:113:    if (!canManageCompanies(role) && session.user.branchId !== branchId) {
+app/api\vcards\route.ts:114:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\vcards\route.ts:166:            role: 'ADVISOR',
+app\components\vcard-card.tsx:86:          href={`/vcards/scans?vcardId=${vcard.id}`}
+app\components\topbar.tsx:48:              <p className="text-xs text-gray-600">{user?.role?.replace('_', ' ')}</p>
+app\components\ThemesGrid.tsx:28:    category: 'PORTAL' | 'VCARD' | 'ADMIN';
+app\components\ThemeEditor.tsx:11:    category: 'PORTAL' | 'VCARD' | 'ADMIN';
+app\components\ThemeEditor.tsx:76:                else if (category === 'ADMIN') router.push('/temas-admin');
+app\api\portal-links\[id]\route.ts:4:import { getServerSession } from 'next-auth';
+app\api\portal-links\[id]\route.ts:9:        const session = await getServerSession(authOptions);
+app\api\portal-links\[id]\route.ts:31:        const session = await getServerSession(authOptions);
+app\api\portal-links\[id]\route.ts:57:        const session = await getServerSession(authOptions);
+app\components\modals\edit-vcard-modal.tsx:69:    Promise.all([fetch('/api/companies'), fetch('/api/branches')])
+app\api\companies\[id]\route.ts:3:import { getServerSession } from 'next-auth';
+app\api\companies\[id]\route.ts:25:  const session = await getServerSession(authOptions);
+app\api\companies\[id]\route.ts:27:  if (!['ADMIN', 'IT', 'SUPER_ADMIN'].includes(String(session.user.role))) {
+app\api\companies\[id]\route.ts:28:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\companies\[id]\route.ts:195:  const session = await getServerSession(authOptions);
+app\api\companies\[id]\route.ts:197:  if (!['ADMIN', 'IT', 'SUPER_ADMIN'].includes(String(session.user.role))) {
+app\api\companies\[id]\route.ts:198:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\components\sidebar.tsx:103:                        href={item.href}
+app\components\sidebar.tsx:134:            <p className="text-xs text-gray-600 truncate">{user?.role?.replace('_', ' ')}</p>
+app\api\portal-links\route.ts:4:import { getServerSession } from 'next-auth';
+app\api\portal-links\route.ts:9:        const session = await getServerSession(authOptions);
+app\api\portal-links\route.ts:27:        const session = await getServerSession(authOptions);
+app\vcards\temas\page.tsx:48:        fetch('/api/branches').then(r => r.json()).then((data) => setBranches(data.branches || [])).catch(console.error);
+app\vcards\temas\page.tsx:53:            const res = await fetch('/api/vcard-themes');
+app\vcards\temas\page.tsx:70:        await fetch('/api/vcard-themes', {
+app\vcards\temas\page.tsx:107:        const res = await fetch('/api/vcard-themes', {
+app\vcards\temas\page.tsx:128:        await fetch('/api/vcard-themes', {
+app\components\modals\create-vcard-modal.tsx:53:        fetch('/api/branches'),
+app\components\modals\create-vcard-modal.tsx:54:        fetch('/api/companies'),
+app\components\modals\create-vcard-modal.tsx:102:      const response = await fetch('/api/vcards', {
+app\api\reports\route.ts:4:import { getServerSession } from 'next-auth';
+app\api\reports\route.ts:9:        const session = await getServerSession(authOptions);
+app\api\reports\route.ts:25:                            select: { name: true, role: true }
+app\api\reports\route.ts:46:            advisorRole: scan.vcard.user.role,
+app\api\dashboard\route.ts:4:import { getServerSession } from 'next-auth';
+app\api\dashboard\route.ts:6:import { canManageCompanies, canViewVcards } from '@/lib/permissions';
+app\api\dashboard\route.ts:10:        const session = await getServerSession(authOptions);
+app\api\dashboard\route.ts:15:        const role = String(session.user.role);
+app\api\dashboard\route.ts:16:        if (!canViewVcards(role)) {
+app\api\dashboard\route.ts:17:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\dashboard\route.ts:20:        const scopedBranchId = !canManageCompanies(role) ? session.user.branchId : undefined;
+app\api\dashboard\route.ts:21:        if (!canManageCompanies(role) && !scopedBranchId) {
+app\api\dashboard\route.ts:22:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\companies\route.ts:3:import { getServerSession } from 'next-auth';
+app\api\companies\route.ts:54:  const session = await getServerSession(authOptions);
+app\api\companies\route.ts:81:  const session = await getServerSession(authOptions);
+app\api\companies\route.ts:83:  if (!['ADMIN', 'IT', 'SUPER_ADMIN'].includes(String(session.user.role))) {
+app\api\companies\route.ts:84:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\vcards\[id]\route.ts:2:import { getServerSession } from 'next-auth';
+app\api\vcards\[id]\route.ts:5:import { canManageCompanies } from '@/lib/permissions';
+app\api\vcards\[id]\route.ts:14:    const session = await getServerSession(authOptions);
+app\api\vcards\[id]\route.ts:17:      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+app\api\vcards\[id]\route.ts:20:    const role = String(session.user.role);
+app\api\vcards\[id]\route.ts:21:    const canManageAny = canManageCompanies(role);
+app\api\vcards\[id]\route.ts:46:    if (!canManageAny && session.user.branchId !== branchId) {
+app\api\vcards\[id]\route.ts:47:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\vcards\[id]\route.ts:115:    const session = await getServerSession(authOptions);
+app\api\vcards\[id]\route.ts:118:      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+app\api\vcards\[id]\route.ts:121:    if (!canManageCompanies(String(session.user.role))) {
+app\api\vcards\[id]\route.ts:122:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\vcards\export\route.ts:2:import { getServerSession } from 'next-auth';
+app/api\vcards\export\route.ts:5:import { canManageCompanies, canViewVcards } from '@/lib/permissions';
+app/api\vcards\export\route.ts:18:    const session = await getServerSession(authOptions);
+app/api\vcards\export\route.ts:21:      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+app/api\vcards\export\route.ts:24:    const role = String(session.user.role);
+app/api\vcards\export\route.ts:25:    if (!canViewVcards(role)) {
+app/api\vcards\export\route.ts:26:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\vcards\export\route.ts:29:    const whereClause = canManageCompanies(role)
+app/api\vcards\export\route.ts:36:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\banners\[id]\route.ts:4:import { getServerSession } from 'next-auth';
+app\api\banners\[id]\route.ts:9:        const session = await getServerSession(authOptions);
+app\api\banners\[id]\route.ts:31:        const session = await getServerSession(authOptions);
+app\api\banners\[id]\route.ts:58:        const session = await getServerSession(authOptions);
+app\api\portal\sessions\route.ts:3:import { getServerSession } from 'next-auth';
+app\api\portal\sessions\route.ts:14:        const session = await getServerSession(authOptions);
+app\api\portal-config\route.ts:3:import { getServerSession } from 'next-auth';
+app\api\portal-config\route.ts:10:        const session = await getServerSession(authOptions);
+app\api\portal-config\route.ts:35:        const session = await getServerSession(authOptions);
+app\api\portal-config\route.ts:36:        if (!session || !session.user || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'MARKETING')) {
+app\api\banners\route.ts:4:import { getServerSession } from 'next-auth';
+app\api\banners\route.ts:9:        const session = await getServerSession(authOptions);
+app\api\banners\route.ts:27:        const session = await getServerSession(authOptions);
+app\api\vcards\scans\route.ts:4:import { getServerSession } from 'next-auth';
+app\api\vcards\scans\route.ts:94:  const session = await getServerSession(authOptions);
+app\api\vcards\scans\route.ts:95:  if (!session?.user || !canViewVcards(session.user.role)) {
+app\vcards\sucursales\page.tsx:44:  role: string;
+app\vcards\sucursales\page.tsx:50:  { id: 'management', label: 'Gerencias', matcher: (employee: Employee) => /gerente|manager/i.test(employee.position || '') || employee.role === 'ADMIN' || employee.role === 'IT' || employee.role === 'SALES_MANAGER' },
+app\vcards\sucursales\page.tsx:52:  { id: 'service', label: 'Asesores de servicio', matcher: (employee: Employee) => /servicio|service/i.test(employee.position || '') || employee.role === 'ADVISOR' },
+app\vcards\sucursales\page.tsx:99:        fetch('/api/branches').then((r) => r.json()),
+app\vcards\sucursales\page.tsx:100:        fetch('/api/companies').then((r) => r.json()),
+app\vcards\sucursales\page.tsx:101:        fetch('/api/vcard-themes').then((r) => r.json()),
+app\vcards\sucursales\page.tsx:102:        fetch('/api/users').then((r) => r.json()),
+app\vcards\sucursales\page.tsx:201:    window.open(`/api/users/template?branchId=${branchId}`, '_blank');
+app\vcards\sucursales\page.tsx:206:      window.open('/api/users/template', '_blank');
+app\vcards\sucursales\page.tsx:209:    window.open(`/api/users/template?companyId=${companyFilter}`, '_blank');
+app\vcards\sucursales\page.tsx:229:      const res = await fetch('/api/users/import', { method: 'POST', body: formData });
+app\vcards\sucursales\page.tsx:465:                                  <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-gray-400">{employee.position || employee.role}</p>
+app\api\promotions\route.ts:4:import { getServerSession } from 'next-auth';
+app\api\promotions\route.ts:9:        const session = await getServerSession(authOptions);
+app\api\promotions\route.ts:27:        const session = await getServerSession(authOptions);
+app\api\branches\route.ts:4:import { getServerSession } from 'next-auth';
+app\api\branches\route.ts:9:    const session = await getServerSession(authOptions);
+app\api\branches\route.ts:48:    const session = await getServerSession(authOptions);
+app\api\vcards\route.ts:2:import { getServerSession } from 'next-auth';
+app\api\vcards\route.ts:9:import { canBulkImportVcards, canManageCompanies, canViewVcards } from '@/lib/permissions';
+app\api\vcards\route.ts:29:    const session = await getServerSession(authOptions);
+app\api\vcards\route.ts:32:      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+app\api\vcards\route.ts:35:    const role = String(session.user.role);
+app\api\vcards\route.ts:36:    if (!canViewVcards(role)) {
+app\api\vcards\route.ts:37:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\vcards\route.ts:40:    const whereClause = canManageCompanies(role)
+app\api\vcards\route.ts:47:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\vcards\route.ts:92:    const session = await getServerSession(authOptions);
+app\api\vcards\route.ts:95:      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+app\api\vcards\route.ts:98:    const role = String(session.user.role);
+app\api\vcards\route.ts:99:    if (!canBulkImportVcards(role)) {
+app\api\vcards\route.ts:100:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\vcards\route.ts:113:    if (!canManageCompanies(role) && session.user.branchId !== branchId) {
+app\api\vcards\route.ts:114:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\vcards\route.ts:166:            role: 'ADVISOR',
+app\api\backup\route.ts:3:import { getServerSession } from 'next-auth';
+app\api\backup\route.ts:15:        const session = await getServerSession(authOptions);
+app\api\backup\route.ts:16:        if (!session || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'ADMIN')) {
+app\api\backup\route.ts:49:        const session = await getServerSession(authOptions);
+app\api\backup\route.ts:50:        if (!session || session.user.role !== 'SUPER_ADMIN') {
+app\api\backup\route.ts:88:                                role: true,
+app\api\backup\route.ts:133:                            role: true,
+app\api\portal\revoke\route.ts:2:import { getServerSession } from 'next-auth';
+app\api\portal\revoke\route.ts:9:  const session = await getServerSession(authOptions);
+app\api\portal\authorize\route.ts:2:import { getServerSession } from 'next-auth';
+app\api\portal\authorize\route.ts:9:  const session = await getServerSession(authOptions);
+app\api\promotions\[id]\route.ts:4:import { getServerSession } from 'next-auth';
+app\api\promotions\[id]\route.ts:9:        const session = await getServerSession(authOptions);
+app\api\promotions\[id]\route.ts:31:        const session = await getServerSession(authOptions);
+app\api\promotions\[id]\route.ts:61:        const session = await getServerSession(authOptions);
+app\api\branches\[id]\route.ts:4:import { getServerSession } from 'next-auth';
+app\api\branches\[id]\route.ts:6:import { canManageCompanies } from '@/lib/permissions';
+app\api\branches\[id]\route.ts:10:        const session = await getServerSession(authOptions);
+app\api\branches\[id]\route.ts:15:        const canManageAny = canManageCompanies(String(session.user.role));
+app\api\branches\[id]\route.ts:16:        if (!canManageAny && session.user.branchId !== params.id) {
+app\api\branches\[id]\route.ts:17:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\branches\[id]\route.ts:23:                users: canManageAny ? {
+app\api\branches\[id]\route.ts:28:                        role: true,
+app\api\branches\[id]\route.ts:66:        const session = await getServerSession(authOptions);
+app\api\branches\[id]\route.ts:70:        if (!canManageCompanies(String(session.user.role))) {
+app\api\branches\[id]\route.ts:71:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\branches\[id]\route.ts:181:        const session = await getServerSession(authOptions);
+app\api\branches\[id]\route.ts:185:        if (!canManageCompanies(String(session.user.role))) {
+app\api\branches\[id]\route.ts:186:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\vcards\page.tsx:79:      const response = await fetch('/api/vcards');
+app\vcards\page.tsx:139:  const handleDownloadTemplate = () => window.open('/api/users/template', '_blank');
+app\vcards\page.tsx:140:  const handleExportData = () => window.open('/api/vcards/export', '_blank');
+app\vcards\page.tsx:149:      const res = await fetch('/api/users/import', { method: 'POST', body: formData });
+app/api\vcard-themes\route.ts:3:import { getServerSession } from 'next-auth';
+app/api\vcard-themes\route.ts:6:import { canManageThemes } from '@/lib/permissions';
+app/api\vcard-themes\route.ts:10:    const session = await getServerSession(authOptions);
+app/api\vcard-themes\route.ts:14:    if (!canManageThemes(String(session.user?.role))) {
+app/api\vcard-themes\route.ts:15:        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\vcard-themes\route.ts:40:    const session = await getServerSession(authOptions);
+app/api\vcard-themes\route.ts:44:    if (!canManageThemes(String(session.user?.role))) {
+app/api\vcard-themes\route.ts:45:        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\vcard-themes\route.ts:109:    const session = await getServerSession(authOptions);
+app/api\vcard-themes\route.ts:113:    if (!canManageThemes(String(session.user?.role))) {
+app/api\vcard-themes\route.ts:114:        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\vcard-themes\route.ts:160:    const session = await getServerSession(authOptions);
+app/api\vcard-themes\route.ts:164:    if (!canManageThemes(String(session.user?.role))) {
+app/api\vcard-themes\route.ts:165:        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\vcards\export\route.ts:2:import { getServerSession } from 'next-auth';
+app\api\vcards\export\route.ts:5:import { canManageCompanies, canViewVcards } from '@/lib/permissions';
+app\api\vcards\export\route.ts:18:    const session = await getServerSession(authOptions);
+app\api\vcards\export\route.ts:21:      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+app\api\vcards\export\route.ts:24:    const role = String(session.user.role);
+app\api\vcards\export\route.ts:25:    if (!canViewVcards(role)) {
+app\api\vcards\export\route.ts:26:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\vcards\export\route.ts:29:    const whereClause = canManageCompanies(role)
+app\api\vcards\export\route.ts:36:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\backup\download\route.ts:3:import { getServerSession } from 'next-auth';
+app\api\backup\download\route.ts:10:        const session = await getServerSession(authOptions);
+app\api\backup\download\route.ts:11:        if (!session || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'ADMIN')) {
+app\api\vcard-themes\route.ts:3:import { getServerSession } from 'next-auth';
+app\api\vcard-themes\route.ts:6:import { canManageThemes } from '@/lib/permissions';
+app\api\vcard-themes\route.ts:10:    const session = await getServerSession(authOptions);
+app\api\vcard-themes\route.ts:14:    if (!canManageThemes(String(session.user?.role))) {
+app\api\vcard-themes\route.ts:15:        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\vcard-themes\route.ts:40:    const session = await getServerSession(authOptions);
+app\api\vcard-themes\route.ts:44:    if (!canManageThemes(String(session.user?.role))) {
+app\api\vcard-themes\route.ts:45:        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\vcard-themes\route.ts:109:    const session = await getServerSession(authOptions);
+app\api\vcard-themes\route.ts:113:    if (!canManageThemes(String(session.user?.role))) {
+app\api\vcard-themes\route.ts:114:        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\vcard-themes\route.ts:160:    const session = await getServerSession(authOptions);
+app\api\vcard-themes\route.ts:164:    if (!canManageThemes(String(session.user?.role))) {
+app\api\vcard-themes\route.ts:165:        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\reportes\page.tsx:36:      const res = await fetch('/api/analytics');
+app\ubicaciones\page.tsx:139:      const res = await fetch('/api/companies');
+app\ubicaciones\page.tsx:151:      const res = await fetch('/api/themes');
+app\ubicaciones\page.tsx:172:      const res = await fetch('/api/branches');
+app\promociones\page.tsx:51:      const res = await fetch('/api/promotions');
+app\usuarios-admin\page.tsx:21:  role: string;
+app\usuarios-admin\page.tsx:54:    role: 'SAC',
+app\usuarios-admin\page.tsx:77:      user.role.toLowerCase().includes(searchQuery.toLowerCase())
+app\usuarios-admin\page.tsx:86:        fetch('/api/users?kind=system'),
+app\usuarios-admin\page.tsx:87:        fetch('/api/branches')
+app\usuarios-admin\page.tsx:111:        role: user.role,
+app\usuarios-admin\page.tsx:125:        role: 'SAC',
+app\usuarios-admin\page.tsx:215:  const roleLabels: Record<string, string> = {
+app\usuarios-admin\page.tsx:216:    'ADMIN': 'Admin',
+app\usuarios-admin\page.tsx:225:  const roleColors: Record<string, string> = {
+app\usuarios-admin\page.tsx:226:    'ADMIN': 'bg-red-100 text-red-800',
+app\usuarios-admin\page.tsx:239:        <Topbar title="Gestión Usuarios" subtitle="Administra usuarios del sistema y sus roles" />
+app\usuarios-admin\page.tsx:313:                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${roleColors[user.role]}`}>
+app\usuarios-admin\page.tsx:314:                            {roleLabels[user.role]}
+app\usuarios-admin\page.tsx:430:                      value={formData.role}
+app\usuarios-admin\page.tsx:431:                      onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+app\usuarios-admin\page.tsx:434:                      <option value="ADMIN">Admin</option>
+app\api\themes\[id]\route.ts:4:import { getServerSession } from 'next-auth';
+app\api\themes\[id]\route.ts:9:        const session = await getServerSession(authOptions);
+app\api\themes\[id]\route.ts:37:        const session = await getServerSession(authOptions);
+app\api\themes\[id]\route.ts:85:        const session = await getServerSession(authOptions);
+app\api\themes\route.ts:4:import { getServerSession } from 'next-auth';
+app\api\themes\route.ts:9:        const session = await getServerSession(authOptions);
+app\api\themes\route.ts:40:        const session = await getServerSession(authOptions);
+app\usuarios\page.tsx:56:      const res = await fetch('/api/portal/sessions');
+app\usuarios\page.tsx:71:      await fetch('/api/portal/revoke', {
+app\usuarios\page.tsx:85:      await fetch('/api/portal/authorize', {
+app\usuarios\page.tsx:99:      await fetch('/api/portal/expire', { method: 'POST' });
+app\vcards\editor\page.tsx:149:      id: 'role', kind: 'text', name: 'Cargo', x: 92, y: 188, width: 320, height: 36, rotation: 0, opacity: 1, zIndex: 5, locked: false, visible: true, allowOverlap: false,
+app\vcards\editor\page.tsx:295:      fetch('/api/themes?category=CARD').then((r) => r.json()).catch(() => ({ themes: [] })),
+app\vcards\editor\page.tsx:296:      fetch('/api/users?kind=vcard').then((r) => r.json()).catch(() => ({ users: [] })),
+app\vcards\editor\page.tsx:552:      const themeData = await fetch('/api/themes?category=CARD').then((r) => r.json());
+app\temas-portal\page.tsx:54:                fetch('/api/themes?category=PORTAL'),
+app\temas-portal\page.tsx:55:                fetch('/api/branches'),
+app\temas-portal\page.tsx:56:                fetch('/api/access-points'),
+app\preview\page.tsx:137:            <a href={getUrl()} target="_blank" rel="noreferrer" className="text-[#003478] text-[10px] font-bold hover:underline flex items-center justify-center gap-1 mt-1">
+app\vcard\[id]\client-page.tsx:70:        await fetch('/api/vcards/scans', {
+app\vcard\[id]\client-page.tsx:159:    fetch('/api/vcards/click', {
+app\vcard\[id]\client-page.tsx:185:    window.open(`https://wa.me/${cleanPhone}`, '_blank', 'noopener,noreferrer');
+app\vcard\[id]\client-page.tsx:235:  const roleRule = (vcard?.branch?.vcardPositionThemeRules || []).find((rule) => rule.positionGroup === userPositionGroup);
+app\vcard\[id]\client-page.tsx:236:  const roleTheme = roleRule?.isEnabled && roleRule?.theme?.isActive ? roleRule.theme : null;
+app\vcard\[id]\client-page.tsx:238:  const activeVCardTheme = roleTheme || branchSeasonalTheme || vcard?.branch?.vcardTheme || companySeasonalTheme || vcard?.branch?.company?.defaultVcardTheme || activeGlobalTheme || vcard?.branch?.theme;
+app\vcard\[id]\client-page.tsx:297:                    window.open(url, '_blank', 'noopener,noreferrer');
+app\vcard\[id]\client-page.tsx:331:                    window.open(url, '_blank', 'noopener,noreferrer');
+app\vcards\companias\page.tsx:13:  category: 'VCARD' | 'PORTAL' | 'ADMIN' | 'CARD';
+app\vcards\companias\page.tsx:55:      fetch('/api/companies').then((r) => r.json()),
+app\vcards\companias\page.tsx:56:      fetch('/api/themes?category=VCARD').then((r) => r.json()),
+app\vcards\companias\page.tsx:139:    await fetch('/api/branches', {
+app\vcards\companias\page.tsx:298:                          <Link href="/vcards/sucursales" className="text-xs font-bold text-[#003478]">Administrar</Link>
+app\vcards\companias\page.tsx:323:              description: 'Aqui veras sucursales y controles de administracion de la empresa.',
+app\api\users\[id]\send-reset-email\route.ts:2:import { getServerSession } from 'next-auth';
+app\api\users\[id]\send-reset-email\route.ts:5:import { canManageSystemUsers } from '@/lib/permissions';
+app\api\users\[id]\send-reset-email\route.ts:11:  const session = await getServerSession(authOptions);
+app\api\users\[id]\send-reset-email\route.ts:12:  if (!session?.user || !canManageSystemUsers(String(session.user.role))) {
+app\api\users\[id]\send-reset-email\route.ts:13:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\users\[id]\route.ts:5:import { getServerSession } from 'next-auth';
+app\api\users\[id]\route.ts:7:import { canManageSystemUsers } from '@/lib/permissions';
+app\api\users\[id]\route.ts:11:        const session = await getServerSession(authOptions);
+app\api\users\[id]\route.ts:15:        if (!canManageSystemUsers(String(session.user.role))) {
+app\api\users\[id]\route.ts:16:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\users\[id]\route.ts:40:        const session = await getServerSession(authOptions);
+app\api\users\[id]\route.ts:44:        if (!canManageSystemUsers(String(session.user.role))) {
+app\api\users\[id]\route.ts:45:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\users\[id]\route.ts:49:        const { name, email, password, role, position, phone, website, branchId, isActive, photoUrl, isSystemUser } = body;
+app\api\users\[id]\route.ts:62:            role,
+app\api\users\[id]\route.ts:88:                details: JSON.stringify({ email: user.email, role: user.role }),
+app\api\users\[id]\route.ts:102:        const session = await getServerSession(authOptions);
+app\api\users\[id]\route.ts:106:        if (!canManageSystemUsers(String(session.user.role))) {
+app\api\users\[id]\route.ts:107:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\temas\page.tsx:54:      const res = await fetch('/api/themes');
+app/api\portal\sessions\route.ts:3:import { getServerSession } from 'next-auth';
+app/api\portal\sessions\route.ts:14:        const session = await getServerSession(authOptions);
+app\api\auth\2fa\verify\route.ts:3:import { getServerSession } from 'next-auth';
+app\api\auth\2fa\verify\route.ts:10:    const session = await getServerSession(authOptions);
+app\api\users\template\route.ts:3:import { getServerSession } from 'next-auth';
+app\api\users\template\route.ts:10:  const session = await getServerSession(authOptions);
+app\api\users\template\route.ts:14:  if (!canBulkImportVcards(String(session.user.role))) {
+app\api\users\template\route.ts:15:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\portal-links\[id]\route.ts:4:import { getServerSession } from 'next-auth';
+app/api\portal-links\[id]\route.ts:9:        const session = await getServerSession(authOptions);
+app/api\portal-links\[id]\route.ts:31:        const session = await getServerSession(authOptions);
+app/api\portal-links\[id]\route.ts:57:        const session = await getServerSession(authOptions);
+app\temas-admin\page.tsx:10:                category="ADMIN"
+app\temas-admin\page.tsx:13:                createPath="/temas/nuevo?category=ADMIN"
+app\api\users\route.ts:5:import { getServerSession } from 'next-auth';
+app\api\users\route.ts:7:import { canBulkImportVcards, canManageSystemUsers } from '@/lib/permissions';
+app\api\users\route.ts:11:        const session = await getServerSession(authOptions);
+app\api\users\route.ts:17:        if (kind === 'system' && !canManageSystemUsers(String(session.user.role))) {
+app\api\users\route.ts:18:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\users\route.ts:20:        if (kind === 'vcard' && !canBulkImportVcards(String(session.user.role))) {
+app\api\users\route.ts:21:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\users\route.ts:52:        const session = await getServerSession(authOptions);
+app\api\users\route.ts:58:        if (!canManageSystemUsers(String(session.user.role)) && body?.isSystemUser !== false) {
+app\api\users\route.ts:59:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\users\route.ts:61:        if (!canBulkImportVcards(String(session.user.role)) && body?.isSystemUser === false) {
+app\api\users\route.ts:62:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\users\route.ts:64:        const { name, email, password, role, position, phone, website, branchId, isActive, photoUrl, isSystemUser } = body;
+app\api\users\route.ts:87:                role: role || 'ADVISOR',
+app\api\users\route.ts:105:                details: JSON.stringify({ email: user.email, name: user.name, role: user.role }),
+app/api\portal-links\route.ts:4:import { getServerSession } from 'next-auth';
+app/api\portal-links\route.ts:9:        const session = await getServerSession(authOptions);
+app/api\portal-links\route.ts:27:        const session = await getServerSession(authOptions);
+app\temas-portal\editor\PortalStudioEditor.tsx:382:      fetch('/api/themes?category=PORTAL').then((r) => r.json()).catch(() => ({ themes: [] })),
+app\temas-portal\editor\PortalStudioEditor.tsx:383:      fetch('/api/users?kind=vcard').then((r) => r.json()).catch(() => ({ users: [] })),
+app\temas-portal\editor\PortalStudioEditor.tsx:724:      const themeData = await fetch('/api/themes?category=PORTAL').then((r) => r.json());
+app/api\banners\[id]\route.ts:4:import { getServerSession } from 'next-auth';
+app/api\banners\[id]\route.ts:9:        const session = await getServerSession(authOptions);
+app/api\banners\[id]\route.ts:31:        const session = await getServerSession(authOptions);
+app/api\banners\[id]\route.ts:58:        const session = await getServerSession(authOptions);
+app\v2\vcard\[id]\client-page.tsx:72:      await fetch('/api/vcards/scans', {
+app\v2\vcard\[id]\client-page.tsx:161:    fetch('/api/vcards/click', {
+app\v2\vcard\[id]\client-page.tsx:198:    window.open(`https://wa.me/${cleanPhone}`, '_blank', 'noopener,noreferrer');
+app\v2\vcard\[id]\client-page.tsx:240:  const roleRule = (vcard?.branch?.vcardPositionThemeRules || []).find((rule) => rule.positionGroup === userPositionGroup);
+app\v2\vcard\[id]\client-page.tsx:241:  const roleTheme = roleRule?.isEnabled && roleRule?.theme?.isActive ? roleRule.theme : null;
+app\v2\vcard\[id]\client-page.tsx:243:  const activeVCardTheme = roleTheme || branchSeasonalTheme || vcard?.branch?.vcardTheme || companySeasonalTheme || vcard?.branch?.company?.defaultVcardTheme || activeGlobalTheme || vcard?.branch?.theme;
+app\v2\vcard\[id]\client-page.tsx:304:                    window.open(url, '_blank', 'noopener,noreferrer');
+app\v2\vcard\[id]\client-page.tsx:340:                    window.open(url, '_blank', 'noopener,noreferrer');
+app/api\banners\route.ts:4:import { getServerSession } from 'next-auth';
+app/api\banners\route.ts:9:        const session = await getServerSession(authOptions);
+app/api\banners\route.ts:27:        const session = await getServerSession(authOptions);
+app/api\portal\revoke\route.ts:2:import { getServerSession } from 'next-auth';
+app/api\portal\revoke\route.ts:9:  const session = await getServerSession(authOptions);
+app\api\auth\2fa\setup\route.ts:4:import { getServerSession } from 'next-auth';
+app\api\auth\2fa\setup\route.ts:11:    const session = await getServerSession(authOptions);
+app\api\users\import\route.ts:3:import { getServerSession } from 'next-auth';
+app\api\users\import\route.ts:26:  const session = await getServerSession(authOptions);
+app\api\users\import\route.ts:30:  if (!canBulkImportVcards(String(session.user.role))) {
+app\api\users\import\route.ts:31:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app\api\users\import\route.ts:93:            role: 'ADVISOR',
+app/api\analytics\route.ts:3:import { getServerSession } from 'next-auth';
+app/api\analytics\route.ts:7:import { canManageCompanies, canViewVcards } from '@/lib/permissions';
+app/api\analytics\route.ts:11:        const session = await getServerSession(authOptions);
+app/api\analytics\route.ts:16:        const role = String(session.user.role);
+app/api\analytics\route.ts:17:        if (!canViewVcards(role)) {
+app/api\analytics\route.ts:18:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\analytics\route.ts:21:        const scopedBranchId = !canManageCompanies(role) ? session.user.branchId : undefined;
+app/api\analytics\route.ts:22:        if (!canManageCompanies(role) && !scopedBranchId) {
+app/api\analytics\route.ts:23:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\portal-config\route.ts:3:import { getServerSession } from 'next-auth';
+app/api\portal-config\route.ts:10:        const session = await getServerSession(authOptions);
+app/api\portal-config\route.ts:35:        const session = await getServerSession(authOptions);
+app/api\portal-config\route.ts:36:        if (!session || !session.user || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'MARKETING')) {
+app/api\promotions\route.ts:4:import { getServerSession } from 'next-auth';
+app/api\promotions\route.ts:9:        const session = await getServerSession(authOptions);
+app/api\promotions\route.ts:27:        const session = await getServerSession(authOptions);
+app/api\users\route.ts:5:import { getServerSession } from 'next-auth';
+app/api\users\route.ts:7:import { canBulkImportVcards, canManageSystemUsers } from '@/lib/permissions';
+app/api\users\route.ts:11:        const session = await getServerSession(authOptions);
+app/api\users\route.ts:17:        if (kind === 'system' && !canManageSystemUsers(String(session.user.role))) {
+app/api\users\route.ts:18:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\users\route.ts:20:        if (kind === 'vcard' && !canBulkImportVcards(String(session.user.role))) {
+app/api\users\route.ts:21:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\users\route.ts:52:        const session = await getServerSession(authOptions);
+app/api\users\route.ts:58:        if (!canManageSystemUsers(String(session.user.role)) && body?.isSystemUser !== false) {
+app/api\users\route.ts:59:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\users\route.ts:61:        if (!canBulkImportVcards(String(session.user.role)) && body?.isSystemUser === false) {
+app/api\users\route.ts:62:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\users\route.ts:64:        const { name, email, password, role, position, phone, website, branchId, isActive, photoUrl, isSystemUser } = body;
+app/api\users\route.ts:87:                role: role || 'ADVISOR',
+app/api\users\route.ts:105:                details: JSON.stringify({ email: user.email, name: user.name, role: user.role }),
+app/api\backup\route.ts:3:import { getServerSession } from 'next-auth';
+app/api\backup\route.ts:15:        const session = await getServerSession(authOptions);
+app/api\backup\route.ts:16:        if (!session || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'ADMIN')) {
+app/api\backup\route.ts:49:        const session = await getServerSession(authOptions);
+app/api\backup\route.ts:50:        if (!session || session.user.role !== 'SUPER_ADMIN') {
+app/api\backup\route.ts:88:                                role: true,
+app/api\backup\route.ts:133:                            role: true,
+app/api\users\[id]\send-reset-email\route.ts:2:import { getServerSession } from 'next-auth';
+app/api\users\[id]\send-reset-email\route.ts:5:import { canManageSystemUsers } from '@/lib/permissions';
+app/api\users\[id]\send-reset-email\route.ts:11:  const session = await getServerSession(authOptions);
+app/api\users\[id]\send-reset-email\route.ts:12:  if (!session?.user || !canManageSystemUsers(String(session.user.role))) {
+app/api\users\[id]\send-reset-email\route.ts:13:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\users\[id]\route.ts:5:import { getServerSession } from 'next-auth';
+app/api\users\[id]\route.ts:7:import { canManageSystemUsers } from '@/lib/permissions';
+app/api\users\[id]\route.ts:11:        const session = await getServerSession(authOptions);
+app/api\users\[id]\route.ts:15:        if (!canManageSystemUsers(String(session.user.role))) {
+app/api\users\[id]\route.ts:16:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\users\[id]\route.ts:40:        const session = await getServerSession(authOptions);
+app/api\users\[id]\route.ts:44:        if (!canManageSystemUsers(String(session.user.role))) {
+app/api\users\[id]\route.ts:45:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\users\[id]\route.ts:49:        const { name, email, password, role, position, phone, website, branchId, isActive, photoUrl, isSystemUser } = body;
+app/api\users\[id]\route.ts:62:            role,
+app/api\users\[id]\route.ts:88:                details: JSON.stringify({ email: user.email, role: user.role }),
+app/api\users\[id]\route.ts:102:        const session = await getServerSession(authOptions);
+app/api\users\[id]\route.ts:106:        if (!canManageSystemUsers(String(session.user.role))) {
+app/api\users\[id]\route.ts:107:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\dashboard\route.ts:4:import { getServerSession } from 'next-auth';
+app/api\dashboard\route.ts:6:import { canManageCompanies, canViewVcards } from '@/lib/permissions';
+app/api\dashboard\route.ts:10:        const session = await getServerSession(authOptions);
+app/api\dashboard\route.ts:15:        const role = String(session.user.role);
+app/api\dashboard\route.ts:16:        if (!canViewVcards(role)) {
+app/api\dashboard\route.ts:17:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\dashboard\route.ts:20:        const scopedBranchId = !canManageCompanies(role) ? session.user.branchId : undefined;
+app/api\dashboard\route.ts:21:        if (!canManageCompanies(role) && !scopedBranchId) {
+app/api\dashboard\route.ts:22:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\promotions\[id]\route.ts:4:import { getServerSession } from 'next-auth';
+app/api\promotions\[id]\route.ts:9:        const session = await getServerSession(authOptions);
+app/api\promotions\[id]\route.ts:31:        const session = await getServerSession(authOptions);
+app/api\promotions\[id]\route.ts:61:        const session = await getServerSession(authOptions);
+app/api\portal\authorize\route.ts:2:import { getServerSession } from 'next-auth';
+app/api\portal\authorize\route.ts:9:  const session = await getServerSession(authOptions);
+app/api\users\template\route.ts:3:import { getServerSession } from 'next-auth';
+app/api\users\template\route.ts:10:  const session = await getServerSession(authOptions);
+app/api\users\template\route.ts:14:  if (!canBulkImportVcards(String(session.user.role))) {
+app/api\users\template\route.ts:15:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\access-points\route.ts:3:import { getServerSession } from 'next-auth';
+app/api\access-points\route.ts:8:  const session = await getServerSession(authOptions);
+app/api\access-points\route.ts:72:  const session = await getServerSession(authOptions);
+app/api\users\import\route.ts:3:import { getServerSession } from 'next-auth';
+app/api\users\import\route.ts:26:  const session = await getServerSession(authOptions);
+app/api\users\import\route.ts:30:  if (!canBulkImportVcards(String(session.user.role))) {
+app/api\users\import\route.ts:31:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\users\import\route.ts:93:            role: 'ADVISOR',
+app/api\themes\[id]\route.ts:4:import { getServerSession } from 'next-auth';
+app/api\themes\[id]\route.ts:9:        const session = await getServerSession(authOptions);
+app/api\themes\[id]\route.ts:37:        const session = await getServerSession(authOptions);
+app/api\themes\[id]\route.ts:85:        const session = await getServerSession(authOptions);
+app/api\access-points\[id]\route.ts:3:import { getServerSession } from 'next-auth';
+app/api\access-points\[id]\route.ts:8:  const session = await getServerSession(authOptions);
+app/api\access-points\[id]\route.ts:49:  const session = await getServerSession(authOptions);
+app/api\themes\route.ts:4:import { getServerSession } from 'next-auth';
+app/api\themes\route.ts:9:        const session = await getServerSession(authOptions);
+app/api\themes\route.ts:40:        const session = await getServerSession(authOptions);
+app/api\backup\download\route.ts:3:import { getServerSession } from 'next-auth';
+app/api\backup\download\route.ts:10:        const session = await getServerSession(authOptions);
+app/api\backup\download\route.ts:11:        if (!session || (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'ADMIN')) {
+app/api\admin\install-ssl\route.ts:3:import { getServerSession } from 'next-auth';
+app/api\admin\install-ssl\route.ts:12:        const session = await getServerSession(authOptions);
+app/api\admin\install-ssl\route.ts:13:        if (!session || !session.user || session.user.role !== 'SUPER_ADMIN') {
+app/api\logs\route.ts:4:import { getServerSession } from 'next-auth';
+app/api\logs\route.ts:9:        const session = await getServerSession(authOptions);
+app/api\logs\route.ts:14:        // Role check - Only Super Admins and local Admins can see logs (based on your structure, let's limit to SUPER_ADMIN)
+app/api\logs\route.ts:15:        if (session.user.role !== 'SUPER_ADMIN' && session.user.role !== 'ADMIN_AGENCIA') {
+app/api\logs\route.ts:16:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\logs\route.ts:31:            select: { id: true, name: true, role: true }
+app/api\logs\route.ts:38:            user: userMap.get(log.userId) || { name: 'Usuario Eliminado', role: 'Desconocido' }
+app/api\access-points\[id]\test\route.ts:3:import { getServerSession } from 'next-auth';
+app/api\access-points\[id]\test\route.ts:9:  const session = await getServerSession(authOptions);
+app/api\companies\route.ts:3:import { getServerSession } from 'next-auth';
+app/api\companies\route.ts:54:  const session = await getServerSession(authOptions);
+app/api\companies\route.ts:81:  const session = await getServerSession(authOptions);
+app/api\companies\route.ts:83:  if (!['ADMIN', 'IT', 'SUPER_ADMIN'].includes(String(session.user.role))) {
+app/api\companies\route.ts:84:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\branches\route.ts:4:import { getServerSession } from 'next-auth';
+app/api\branches\route.ts:9:    const session = await getServerSession(authOptions);
+app/api\branches\route.ts:48:    const session = await getServerSession(authOptions);
+app/api\signup\route.ts:5:import { getServerSession } from 'next-auth';
+app/api\signup\route.ts:7:import { canManageSystemUsers } from '@/lib/permissions';
+app/api\signup\route.ts:13:    const session = await getServerSession(authOptions);
+app/api\signup\route.ts:17:    if (!canManageSystemUsers(String(session.user.role))) {
+app/api\signup\route.ts:18:      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\signup\route.ts:52:        role: 'ADVISOR', // Default role for testing
+app/api\admin\smtp\send-it-invites\route.ts:2:import { getServerSession } from 'next-auth';
+app/api\admin\smtp\send-it-invites\route.ts:5:import { canManageSystemUsers } from '@/lib/permissions';
+app/api\admin\smtp\send-it-invites\route.ts:11:  const session = await getServerSession(authOptions);
+app/api\admin\smtp\send-it-invites\route.ts:12:  if (!session?.user || !canManageSystemUsers(String(session.user.role))) {
+app/api\admin\smtp\send-it-invites\route.ts:13:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\admin\smtp\send-it-invites\route.ts:40:        html: `<p>Hola <b>${user.name}</b>,</p><p>Tu acceso de prueba a la plataforma vCard ya esta listo.</p><p><a href="${appUrl}/login">Ingresar a la plataforma</a></p><p>Por seguridad, cambia tu contrasena inmediatamente despues de entrar.</p><p>Usuario: <b>${user.email}</b></p>`,
+app/api\reports\route.ts:4:import { getServerSession } from 'next-auth';
+app/api\reports\route.ts:9:        const session = await getServerSession(authOptions);
+app/api\reports\route.ts:25:                            select: { name: true, role: true }
+app/api\reports\route.ts:46:            advisorRole: scan.vcard.user.role,
+app/api\admin\smtp\status\route.ts:2:import { getServerSession } from 'next-auth';
+app/api\admin\smtp\status\route.ts:4:import { canManageSystemUsers } from '@/lib/permissions';
+app/api\admin\smtp\status\route.ts:9:  const session = await getServerSession(authOptions);
+app/api\admin\smtp\status\route.ts:10:  if (!session?.user || !canManageSystemUsers(String(session.user.role))) {
+app/api\admin\smtp\status\route.ts:11:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\companies\[id]\route.ts:3:import { getServerSession } from 'next-auth';
+app/api\companies\[id]\route.ts:25:  const session = await getServerSession(authOptions);
+app/api\companies\[id]\route.ts:27:  if (!['ADMIN', 'IT', 'SUPER_ADMIN'].includes(String(session.user.role))) {
+app/api\companies\[id]\route.ts:28:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\companies\[id]\route.ts:195:  const session = await getServerSession(authOptions);
+app/api\companies\[id]\route.ts:197:  if (!['ADMIN', 'IT', 'SUPER_ADMIN'].includes(String(session.user.role))) {
+app/api\companies\[id]\route.ts:198:    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\branches\[id]\route.ts:4:import { getServerSession } from 'next-auth';
+app/api\branches\[id]\route.ts:6:import { canManageCompanies } from '@/lib/permissions';
+app/api\branches\[id]\route.ts:10:        const session = await getServerSession(authOptions);
+app/api\branches\[id]\route.ts:15:        const canManageAny = canManageCompanies(String(session.user.role));
+app/api\branches\[id]\route.ts:16:        if (!canManageAny && session.user.branchId !== params.id) {
+app/api\branches\[id]\route.ts:17:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\branches\[id]\route.ts:23:                users: canManageAny ? {
+app/api\branches\[id]\route.ts:28:                        role: true,
+app/api\branches\[id]\route.ts:66:        const session = await getServerSession(authOptions);
+app/api\branches\[id]\route.ts:70:        if (!canManageCompanies(String(session.user.role))) {
+app/api\branches\[id]\route.ts:71:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\branches\[id]\route.ts:181:        const session = await getServerSession(authOptions);
+app/api\branches\[id]\route.ts:185:        if (!canManageCompanies(String(session.user.role))) {
+app/api\branches\[id]\route.ts:186:            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+app/api\auth\2fa\setup\route.ts:4:import { getServerSession } from 'next-auth';
+app/api\auth\2fa\setup\route.ts:11:    const session = await getServerSession(authOptions);
+app/api\auth\2fa\verify\route.ts:3:import { getServerSession } from 'next-auth';
+app/api\auth\2fa\verify\route.ts:10:    const session = await getServerSession(authOptions);

@@ -1,5 +1,16 @@
 # Development Plan — VCards V2
 
+## Orden de ejecución vigente desde 2026-10-16
+
+1. **Plataforma y límites operativos:** inventario completo, respaldo verificable, separación 9306/9301 y retirada de superficies cautivas del 9306.
+2. **Seguridad transversal:** autenticación/roles, logs, respaldos, endpoints administrativos, dependencias, contenido activo y privacidad.
+3. **Administración central:** dashboard, usuarios, empresas, ciudades, sucursales, configuración, reportes y estados de error/carga/vacío.
+4. **Diseño y marketing:** temas, banners, promociones y editores con controles seguros, previsualización y flujo corporativo.
+5. **Administración de nodos:** placeholder navegable; conectores e ID/Key quedan bloqueados hasta crear el nodo y su contrato.
+6. **VCards al final:** creación/edición, temas por marca/cargo, V1/QR, V2 premium, acciones, agenda por correo y matriz visual 3×5.
+7. **HTTPS al final:** después de pruebas completas, dominio definitivo, proxy, certificados y reversión.
+8. **Un solo cambio productivo:** release versionado, smoke tests, cambio exclusivo de 9306 y rollback ante regresión; 9301 no se reinicia.
+
 ## Reglas de ejecución
 
 - Trabajar solo en `feat/vcards-v2-visual-overhaul` dentro del repositorio local.

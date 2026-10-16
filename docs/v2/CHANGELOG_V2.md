@@ -1,5 +1,19 @@
 # Changelog V2
 
+## 2026-10-16 — Reparación funcional validada en VM aislada
+
+- Añadida selección encadenada Empresa → Ciudad → Sucursal en creación y edición de vCards, con auto-selección cuando solo existe una opción.
+- Validada en servidor la relación empresa/sucursal y agrupadas en transacción las escrituras de usuario/vCard.
+- Corregida la analítica V1 para enviar el ID interno de la vCard y distinguir acceso QR de acceso directo.
+- Eliminado el valor de firma inválida de auditorías y evitado imprimir valores de query string en logs del middleware.
+- Reorientada la navegación a VCards y agregado el placeholder no operativo “Administración de portales”; no se modificó el servicio 9301.
+- Actualizados identidad global, login, campos accesibles y favicon.
+- Corregido el comando de pruebas para que funcione en Windows y Linux.
+- Aprobados 7 tests, typecheck, lint sin errores y build en la copia aislada de la VM.
+- Generadas 15 capturas fechadas para Ford, GAC y Quick Lane en los cinco anchos requeridos; consola sin errores.
+
+No se ejecutaron migraciones ni escrituras de QA en PostgreSQL. El despliegue de 9306 todavía no forma parte de esta entrada.
+
 ## 2026-10-14 — Rama `feat/vcards-v2-visual-overhaul`
 
 - Recuperado y versionado un snapshot saneado del código activo 9306 en GitHub.

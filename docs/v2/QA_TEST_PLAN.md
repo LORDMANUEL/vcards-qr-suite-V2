@@ -81,3 +81,22 @@ Ejecutar para cada marca en 360, 390, 768, 1024 y 1440 px:
 - No se validó el proxy público ni un certificado HTTPS frontal.
 - No se realizó prueba visual dinámica por marca: faltan fixtures sintéticos y entorno de ejecución aislado.
 - Un log histórico de build no equivale a una nueva validación del código local.
+
+## Ejecución aislada en VM — 2026-10-16
+
+Entorno: `/home/yc/vcards-v2-work-20261016`, escuchando solo en `127.0.0.1:9406` mediante túnel SSH. No se reinició 9301 ni 9306 y no se ejecutaron migraciones, seeds o envíos de formularios contra PostgreSQL.
+
+| Control | Resultado comprobado |
+|---|---|
+| Unitarias | 7/7 aprobadas en Linux: marca, cargo, mailto/cita, URL segura y cascada Empresa → Ciudad → Sucursal |
+| Typecheck | Aprobado en VM con `tsc --noEmit --incremental false` |
+| Lint | Aprobado sin errores; permanecen advertencias heredadas de `<img>` y dependencias de Hooks |
+| Build | Aprobado en VM con Next.js 14.2.28, 48/48 páginas generadas |
+| Navegador | Ford, GAC y Quick Lane renderizados sin errores de consola |
+| Responsive | 15 capturas nuevas en 360, 390, 768, 1024 y 1440 px; sin overflow horizontal observado |
+| Jerarquía | Un hero corporativo y un perfil por fixture; seis acciones visibles por marca |
+| Producción | Sin cambios durante esta ejecución |
+
+Evidencia visual fechada: `docs/v2/evidence/visual/*-20261016.png`.
+
+Limitaciones que permanecen abiertas: no se inició sesión con una cuenta real en el entorno aislado, por lo que el modal conectado a datos reales no se envió; no se probaron acciones que abren aplicaciones externas; no se ejecutó una restauración de PostgreSQL; HTTPS y la actualización de Next.js quedan en fases separadas.

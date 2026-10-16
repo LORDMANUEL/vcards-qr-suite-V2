@@ -1,5 +1,22 @@
 # Auditoría integral — Hallazgos VCards
 
+## Ampliación de alcance — 2026-10-16
+
+La plataforma 9306 no se reduce a `/v2/vcard/[id]`: el inventario actual contiene 45 pantallas, 49 endpoints API, middleware, autenticación NextAuth, Prisma/PostgreSQL, administración organizacional, usuarios, auditoría, respaldos, temas, marketing, reportes, VCards y código legado de portal cautivo. Por instrucción del propietario, la corrección de VCards queda al final; primero se valida y endurece la plataforma completa.
+
+| Prioridad | Hallazgo confirmado | Causa/evidencia | Tratamiento |
+|---|---|---|---|
+| P0 | Operaciones del portal cautivo siguen expuestas en 9306 | Rutas públicas de registro/sesión/RADIUS pueden escribir PII y autorizar sesiones aunque 9301 ya es el nodo independiente | Modo `VCARDS_ONLY_MODE` para retirar UI/API cautivas únicamente en 9306; 9301 queda intacto |
+| P0 | Dependencias vulnerables | `npm audit --omit=dev`: 33 hallazgos de producción (4 críticos, 15 altos, 12 moderados, 2 bajos); directos incluyen Next.js, NextAuth, Plotly, Lodash, Nodemailer y XLSX | Actualización escalonada y pruebas de compatibilidad; no aplicar saltos mayores automáticos |
+| P0 | Respaldo inseguro cuando falla `pg_dump` | El fallback JSON serializa usuarios, teléfonos, escaneos y sesiones a disco | Eliminar fallback y fallar cerrado; lista/descarga solo para `SUPER_ADMIN` |
+| P0 | HTML/iframe configurables sin política suficiente | `dangerouslySetInnerHTML` e iframes aparecen en runtime y editores | Sanitización, sandbox y allowlist antes de liberar editores |
+| P1 | Roles de logs contradictorios | UI permite ADMIN/IT; API esperaba SUPER_ADMIN/ADMIN_AGENCIA | Unificar permiso, limitar resultados y redactar IP |
+| P1 | Instalador SSL ejecuta un proceso desde web | Endpoint SUPER_ADMIN llama un script local; HTTPS fue definido como última fase | Deshabilitar por defecto y usar `execFile` sin shell |
+| P1 | Ocultar menú no retira módulos cautivos | Rutas y APIs seguían accesibles directamente | Redirigir UI vieja al gestor de nodos y responder 410 en APIs retiradas |
+| P1 | Pruebas no portables a Linux | El glob `tests/**/*.test.ts` no fue expandido por el host remoto | Cambiado a `tests/*.test.ts`; validado en VM |
+
+Evidencia operativa: 9306 ejecuta `/home/yc/vcards-fase1-20261014-101842`; 9301 ejecuta `/home/yc/vcard-system`. El respaldo previo de 9306 está en `/home/yc/backups/vcards-9306-pre-20261016-qa`, ocupa 339 MB y contiene 849 archivos, igual conteo que el origen. Producción no fue reiniciada ni reemplazada durante esta fase.
+
 ## Alcance y método
 
 Auditoría de solo lectura realizada el 2026-10-14 sobre la fuente activa de 9306, unidades de servicio, respuestas HTTP locales y la instantánea local. No se leyeron `.env`, secretos ni datos personales; no se modificaron archivos, BD, servicios o procesos.
