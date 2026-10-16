@@ -29,13 +29,26 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   }
 
   const body = await req.json();
+  const name = String(body?.name || '').trim();
+  const slug = slugify(String(body?.slug || name));
+  if (!name || !slug) {
+    return NextResponse.json({ error: 'Nombre de empresa requerido' }, { status: 400 });
+  }
+  const conflictingCompany = await prisma.company.findFirst({
+    where: { id: { not: params.id }, OR: [{ name }, { slug }] },
+    select: { id: true },
+  });
+  if (conflictingCompany) {
+    return NextResponse.json({ error: 'Ya existe una empresa con ese nombre o slug' }, { status: 409 });
+  }
+
   const company = await prisma.$transaction(async (tx) => {
     const current = await tx.company.findUnique({ where: { id: params.id } });
     const updated = await tx.company.update({
       where: { id: params.id },
       data: {
-        name: body.name,
-        slug: body.slug || null,
+        name,
+        slug,
         logoUrl: body.logoUrl || null,
         primaryColor: body.primaryColor || '#003478',
         secondaryColor: body.secondaryColor || '#FFFFFF',
@@ -44,10 +57,10 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       },
     });
 
-    if (current && current.name !== body.name) {
+    if (current && current.name !== name) {
       await tx.branch.updateMany({
         where: { companyId: params.id, companyName: current.name },
-        data: { companyName: body.name },
+        data: { companyName: name },
       });
     }
 
@@ -65,7 +78,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       },
     });
 
-    const principalName = body.baseBranchName || body.name;
+    const principalName = body.baseBranchName || name;
     const principalCity = body.baseCity || body.city || null;
     const principalAddress = body.baseAddress || body.address || null;
     const principalCountry = body.country || 'Honduras';
@@ -76,7 +89,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         where: { id: principal.id },
         data: {
           companyId: params.id,
-          companyName: body.name,
+          companyName: name,
           name: principalName,
           city: principalCity,
           address: principalAddress,
@@ -88,7 +101,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       await tx.branch.create({
         data: {
           companyId: params.id,
-          companyName: body.name,
+          companyName: name,
           name: principalName,
           city: principalCity,
           address: principalAddress,
@@ -104,7 +117,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       });
     }
 
-    const extraBranches = normalizeBranches(body.branches, body.name);
+    const extraBranches = normalizeBranches(body.branches, name);
     const updatedBranches = await tx.branch.findMany({
       where: { companyId: params.id },
       select: { id: true, uniqueSlug: true, city: true, sortOrder: true },
@@ -126,7 +139,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
           where: { id: foundBySlug.id },
           data: {
             companyId: params.id,
-            companyName: body.name,
+            companyName: name,
             name: branch.name,
             city: branch.city,
             address: branch.address,
@@ -149,7 +162,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
           where: { id: foundByCity.id },
           data: {
             companyId: params.id,
-            companyName: body.name,
+            companyName: name,
             name: branch.name,
             city: branch.city,
             address: branch.address,
@@ -169,7 +182,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       await tx.branch.create({
         data: {
           companyId: params.id,
-          companyName: body.name,
+          companyName: name,
           name: branch.name,
           city: branch.city,
           address: branch.address,
@@ -198,9 +211,18 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.branch.updateMany({ where: { companyId: params.id }, data: { companyId: null } });
-    await tx.company.delete({ where: { id: params.id } });
+  const company = await prisma.company.findUnique({
+    where: { id: params.id },
+    select: { id: true, _count: { select: { branches: true } } },
   });
+  if (!company) return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
+  if (company._count.branches > 0) {
+    return NextResponse.json({
+      error: 'No se puede borrar la empresa mientras tenga sucursales asociadas.',
+      dependencies: { branches: company._count.branches },
+    }, { status: 409 });
+  }
+
+  await prisma.company.delete({ where: { id: params.id } });
   return NextResponse.json({ success: true });
 }

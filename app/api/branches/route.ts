@@ -5,6 +5,10 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { canManageCompanies, canViewVcards } from '@/lib/permissions';
 
+function slugify(value: string) {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -71,6 +75,13 @@ export async function POST(req: Request) {
       routerSerial, ssidTarget, setupGuide, uniqueSlug
     } = body;
 
+    if (!companyId) {
+      return NextResponse.json({ error: 'Debe seleccionar una empresa' }, { status: 400 });
+    }
+    if (!city || !String(city).trim()) {
+      return NextResponse.json({ error: 'Debe indicar la ciudad de la sucursal' }, { status: 400 });
+    }
+
     let resolvedCompanyName = companyName;
     let resolvedThemeId = vcardThemeId;
     let resolvedSeasonalThemeId = seasonalVcardThemeId;
@@ -78,21 +89,33 @@ export async function POST(req: Request) {
     let resolvedSecondaryColor = secondaryColor || '#FFFFFF';
     let resolvedLogoUrl = logoUrl;
 
-    if (companyId) {
-      const company = await prisma.company.findUnique({ where: { id: companyId } });
-      if (!company) {
-        return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
-      }
-      resolvedCompanyName = company.name;
-      resolvedThemeId = resolvedThemeId || company.defaultVcardThemeId || null;
-      resolvedSeasonalThemeId = resolvedSeasonalThemeId || company.seasonalVcardThemeId || null;
-      resolvedPrimaryColor = primaryColor || company.primaryColor;
-      resolvedSecondaryColor = secondaryColor || company.secondaryColor;
-      resolvedLogoUrl = logoUrl || company.logoUrl;
+    const company = await prisma.company.findUnique({ where: { id: companyId } });
+    if (!company) {
+      return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 });
     }
+    resolvedCompanyName = company.name;
+    resolvedThemeId = resolvedThemeId || company.defaultVcardThemeId || null;
+    resolvedSeasonalThemeId = resolvedSeasonalThemeId || company.seasonalVcardThemeId || null;
+    resolvedPrimaryColor = primaryColor || company.primaryColor;
+    resolvedSecondaryColor = secondaryColor || company.secondaryColor;
+    resolvedLogoUrl = logoUrl || company.logoUrl;
 
     if (!name || !String(name).trim()) {
       return NextResponse.json({ error: 'Nombre de sucursal requerido' }, { status: 400 });
+    }
+
+    const resolvedSlug = slugify(String(uniqueSlug || `${company.slug || company.name}-${city}`));
+    const duplicate = await prisma.branch.findFirst({
+      where: {
+        OR: [
+          { uniqueSlug: resolvedSlug },
+          { companyId, city: { equals: String(city).trim(), mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true },
+    });
+    if (duplicate) {
+      return NextResponse.json({ error: 'Ya existe una sucursal para esa ciudad o slug' }, { status: 409 });
     }
 
     const lastBranch = await prisma.branch.findFirst({
@@ -120,7 +143,7 @@ export async function POST(req: Request) {
         routerSerial,
         ssidTarget,
         setupGuide,
-        uniqueSlug
+        uniqueSlug: resolvedSlug
       },
     });
 

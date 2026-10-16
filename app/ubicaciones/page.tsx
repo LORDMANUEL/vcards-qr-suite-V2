@@ -262,7 +262,8 @@ export default function UbicacionesPage() {
         await loadBranches();
         setShowModal(false);
       } else {
-        alert('Error al guardar la sucursal');
+        const data = await res.json().catch(() => ({}));
+        alert(data?.error || 'Error al guardar la sucursal');
       }
     } catch (error) {
       console.error('Error saving branch:', error);
@@ -275,7 +276,12 @@ export default function UbicacionesPage() {
     if (!confirm('¿Estás seguro de que deseas eliminar esta sucursal?')) return;
     try {
       const res = await fetch(`/api/branches/${id}`, { method: 'DELETE' });
-      if (res.ok) await loadBranches();
+      if (res.ok) {
+        await loadBranches();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data?.error || 'No se pudo eliminar la sucursal');
+      }
     } catch (error) {
       console.error('Error deleting branch:', error);
     }

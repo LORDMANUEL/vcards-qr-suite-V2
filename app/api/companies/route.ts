@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
+import { canManageCompanies, canViewVcards } from '@/lib/permissions';
 
 function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -53,8 +54,16 @@ async function ensureCompanyDefaultTheme(tx: any, body: any) {
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const canManageAny = canManageCompanies(String(session.user.role));
+  if (!canManageAny && !canViewVcards(String(session.user.role))) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  if (!canManageAny && !session.user.branchId) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const companies = await prisma.company.findMany({
+    where: canManageAny ? undefined : { branches: { some: { id: session.user.branchId! } } },
     orderBy: { createdAt: 'desc' },
     include: {
       defaultVcardTheme: { select: { id: true, name: true } },
@@ -65,6 +74,9 @@ export async function GET() {
           id: true,
           name: true,
           city: true,
+          address: true,
+          country: true,
+          uniqueSlug: true,
           sortOrder: true,
           vcardThemeId: true,
           seasonalVcardThemeId: true,
@@ -85,12 +97,27 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
+  const name = String(body?.name || '').trim();
+  const slug = slugify(String(body?.slug || name));
+  if (!name || !slug) {
+    return NextResponse.json({ error: 'Nombre de empresa requerido' }, { status: 400 });
+  }
+  const existingCompany = await prisma.company.findFirst({
+    where: { OR: [{ name }, { slug }] },
+    select: { id: true },
+  });
+  if (existingCompany) {
+    return NextResponse.json({ error: 'Ya existe una empresa con ese nombre o slug' }, { status: 409 });
+  }
+
+  body.name = name;
+  body.slug = slug;
   const company = await prisma.$transaction(async (tx) => {
     const defaultThemeId = await ensureCompanyDefaultTheme(tx, body);
     const created = await tx.company.create({
       data: {
-        name: body.name,
-        slug: body.slug || slugify(body.name),
+        name,
+        slug,
         logoUrl: body.logoUrl || null,
         primaryColor: body.primaryColor || '#003478',
         secondaryColor: body.secondaryColor || '#FFFFFF',
@@ -107,7 +134,7 @@ export async function POST(req: Request) {
         city: body.baseCity || body.city || null,
         address: body.baseAddress || body.address || null,
         country: body.country || 'Honduras',
-        uniqueSlug: slugify(body.baseBranchName || body.name),
+        uniqueSlug: slugify(`${slug}-${body.baseCity || body.city || 'principal'}`),
         primaryColor: created.primaryColor,
         secondaryColor: created.secondaryColor,
         logoUrl: created.logoUrl,

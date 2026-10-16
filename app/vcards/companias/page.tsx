@@ -26,6 +26,9 @@ interface Company {
     id: string;
     name: string;
     city?: string | null;
+    address?: string | null;
+    country?: string | null;
+    uniqueSlug?: string | null;
     sortOrder?: number;
   }>;
   _count?: { branches: number };
@@ -73,9 +76,9 @@ export default function VcardCompaniesPage() {
         defaultVcardThemeId: company.defaultVcardThemeId || '',
         seasonalVcardThemeId: company.seasonalVcardThemeId || '',
         baseCity: company.branches?.[0]?.city || 'San Pedro Sula',
-        baseAddress: '',
-        country: 'Honduras',
-        branches: company.branches?.slice(1).map((branch) => ({ city: branch.city || '', address: '', uniqueSlug: '' })) || [{ city: 'Tegucigalpa', address: '', uniqueSlug: '' }],
+        baseAddress: company.branches?.[0]?.address || '',
+        country: company.branches?.[0]?.country || 'Honduras',
+        branches: company.branches?.slice(1).map((branch) => ({ city: branch.city || '', address: branch.address || '', uniqueSlug: branch.uniqueSlug || '' })) || [{ city: 'Tegucigalpa', address: '', uniqueSlug: '' }],
       });
     } else {
       setEditing(null);
@@ -114,16 +117,33 @@ export default function VcardCompaniesPage() {
   };
 
   const saveCompany = async () => {
+    if (!formData.name.trim()) {
+      showToast('El nombre de la empresa es obligatorio.');
+      setWizardStep(1);
+      return;
+    }
     const url = editing ? `/api/companies/${editing.id}` : '/api/companies';
     const method = editing ? 'PUT' : 'POST';
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
+    const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      showToast(data?.error || 'No se pudo guardar la empresa.');
+      return;
+    }
     setShowModal(false);
+    showToast(editing ? 'Empresa actualizada.' : 'Empresa creada.', 'ok');
     await loadData();
   };
 
   const deleteCompany = async (id: string) => {
     if (!confirm('Eliminar empresa vCard?')) return;
-    await fetch(`/api/companies/${id}`, { method: 'DELETE' });
+    const response = await fetch(`/api/companies/${id}`, { method: 'DELETE' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      showToast(data?.error || 'No se pudo eliminar la empresa.');
+      return;
+    }
+    showToast('Empresa eliminada.', 'ok');
     await loadData();
   };
 
@@ -136,7 +156,7 @@ export default function VcardCompaniesPage() {
   const createBranch = async () => {
     if (!selectedCompany || !branchForm.city) return;
     const branchName = `${selectedCompany.name} - ${branchForm.city}`;
-    await fetch('/api/branches', {
+    const response = await fetch('/api/branches', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -148,7 +168,13 @@ export default function VcardCompaniesPage() {
         uniqueSlug: branchForm.uniqueSlug || `${selectedCompany.slug || selectedCompany.name.toLowerCase()}-${branchForm.city.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
       }),
     });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      showToast(data?.error || 'No se pudo crear la sucursal.');
+      return;
+    }
     setShowBranchModal(false);
+    showToast('Sucursal creada.', 'ok');
     await loadData();
   };
 
