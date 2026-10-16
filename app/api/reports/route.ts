@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { canManageCompanies, canViewVcards } from '@/lib/permissions';
 
 export async function GET(req: Request) {
     try {
@@ -11,11 +12,25 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        const role = String(session.user.role);
+        if (!canViewVcards(role)) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
+        const scopedBranchId = !canManageCompanies(role) ? session.user.branchId : undefined;
+        if (!canManageCompanies(role) && !scopedBranchId) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
         const { searchParams } = new URL(req.url);
-        const limit = parseInt(searchParams.get('limit') || '100');
+        const requestedLimit = Number.parseInt(searchParams.get('limit') || '100', 10);
+        const limit = Number.isFinite(requestedLimit)
+            ? Math.min(Math.max(requestedLimit, 1), 500)
+            : 100;
 
         // Fetch latest scans including user and branch info
         const scans = await prisma.scan.findMany({
+            where: scopedBranchId ? { vcard: { branchId: scopedBranchId } } : undefined,
             take: limit,
             orderBy: { scannedAt: 'desc' },
             include: {
@@ -36,11 +51,9 @@ export async function GET(req: Request) {
         const formattedScans = scans.map((scan: any) => ({
             id: scan.id,
             date: scan.scannedAt,
-            ipAddress: scan.ipAddress || 'Unknown',
             city: scan.city || '-',
             country: scan.country || '-',
             deviceType: scan.deviceType || 'Unknown',
-            userAgent: scan.userAgent || 'Unknown',
             scanMethod: scan.scanMethod || 'QR',
             advisorName: scan.vcard.user.name,
             advisorRole: scan.vcard.user.role,

@@ -5,58 +5,62 @@ import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import {
   LayoutDashboard,
-  Users,
   Palette,
-  Megaphone,
   QrCode,
-  Link as LinkIcon,
-  CheckCircle,
   Globe,
-  Eye,
   Edit,
   BarChart3,
-  Image as ImageIcon,
-  Wifi,
   Database,
   UserCog,
-  MapPin,
-  FileText,
   Settings,
   LogOut,
-  ChevronDown,
-  ChevronRight,
-  ShieldCheck,
-  History,
   Printer,
   Building2,
 } from 'lucide-react';
+import {
+  canBulkImportVcards,
+  canManageCompanies,
+  canManageSystemUsers,
+  canManageThemes,
+  canViewVcards,
+} from '@/lib/permissions';
+
+type MenuItem = {
+  name: string;
+  icon: typeof LayoutDashboard;
+  href: string;
+  canView: (role: string | undefined) => boolean;
+};
+
+const isSystemRole = (role: string | undefined) => Boolean(role);
+const isSuperAdmin = (role: string | undefined) => role === 'SUPER_ADMIN';
 
 const menuGroups = [
   {
     name: 'General',
     items: [
-      { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
+      { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard', canView: isSystemRole },
     ]
   },
   {
     name: 'vCards',
     items: [
-      { name: 'Generador QR/vCards', icon: QrCode, href: '/vcards' },
-      { name: 'Empresas vCard', icon: Building2, href: '/vcards/companias' },
-      { name: 'Theme Builder', icon: Edit, href: '/vcards/theme-builder' },
-      { name: 'Editor Temas vCard', icon: Palette, href: '/vcards/temas' },
-      { name: 'Editor de Tarjetas', icon: Printer, href: '/vcards/editor' },
-      { name: 'Reportes de Escaneo', icon: BarChart3, href: '/reportes?tab=vcards' },
+      { name: 'Generador QR/vCards', icon: QrCode, href: '/vcards', canView: canViewVcards },
+      { name: 'Empresas vCard', icon: Building2, href: '/vcards/companias', canView: canManageCompanies },
+      { name: 'Theme Builder', icon: Edit, href: '/vcards/theme-builder', canView: canManageThemes },
+      { name: 'Editor Temas vCard', icon: Palette, href: '/vcards/temas', canView: canManageThemes },
+      { name: 'Editor de Tarjetas', icon: Printer, href: '/vcards/editor', canView: canBulkImportVcards },
+      { name: 'Reportes de Escaneo', icon: BarChart3, href: '/reportes?tab=vcards', canView: canViewVcards },
     ]
   },
   {
     name: 'Sistema',
     items: [
-      { name: 'Administración de portales', icon: Globe, href: '/portales' },
-      { name: 'Gestión Usuarios', icon: UserCog, href: '/usuarios-admin' },
-      { name: 'Temas Admin', icon: Palette, href: '/temas-admin' },
-      { name: 'BD Manager', icon: Database, href: '/backup' },
-      { name: 'Configuración', icon: Settings, href: '/configuraciones' },
+      { name: 'Administración de portales', icon: Globe, href: '/portales', canView: canManageCompanies },
+      { name: 'Gestión Usuarios', icon: UserCog, href: '/usuarios-admin', canView: canManageSystemUsers },
+      { name: 'Temas Admin', icon: Palette, href: '/temas-admin', canView: canManageThemes },
+      { name: 'BD Manager', icon: Database, href: '/backup', canView: isSuperAdmin },
+      { name: 'Configuración', icon: Settings, href: '/configuraciones', canView: canManageThemes },
     ]
   },
 ];
@@ -66,6 +70,7 @@ export function Sidebar() {
   const { data: session } = useSession() || {};
 
   const user = session?.user;
+  const role = user?.role;
   const initials = user?.name
     ?.split(' ')
     ?.map((n) => n?.[0])
@@ -87,15 +92,20 @@ export function Sidebar() {
       {/* Menu Items */}
       <nav className="flex-1 overflow-y-auto py-4 scrollbar-hide">
         <div className="px-4 space-y-6">
-          {menuGroups.map((group) => (
+          {menuGroups.map((group) => {
+            const visibleItems = (group.items as MenuItem[]).filter((item) => item.canView(role));
+            if (visibleItems.length === 0) return null;
+
+            return (
             <div key={group.name} className="space-y-2">
               <h3 className="px-3 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
                 {group.name}
               </h3>
               <ul className="space-y-1">
-                {group.items.map((item) => {
+                {visibleItems.map((item) => {
                   const Icon = item.icon;
-                  const isActive = pathname === item.href;
+                  const itemPath = item.href.split('?')[0];
+                  const isActive = pathname === itemPath || pathname.startsWith(`${itemPath}/`);
 
                   return (
                     <li key={item.name}>
@@ -119,7 +129,8 @@ export function Sidebar() {
                 })}
               </ul>
             </div>
-          ))}
+            );
+          })}
         </div>
       </nav>
 
