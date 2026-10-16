@@ -26,3 +26,9 @@ export const RETIRED_CAPTIVE_API_PREFIXES = [
 export function matchesPathPrefix(pathname: string, prefixes: readonly string[]) {
   return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
+
+const PUBLIC_UI_PREFIXES = ['/login', '/vcard', '/v2/vcard', '/v2/visual-fixture'] as const;
+
+export function isPublicUiPath(pathname: string) {
+  return matchesPathPrefix(pathname, PUBLIC_UI_PREFIXES);
+}

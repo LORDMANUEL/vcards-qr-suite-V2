@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   RETIRED_CAPTIVE_API_PREFIXES,
   RETIRED_CAPTIVE_UI_PATHS,
+  isPublicUiPath,
   matchesPathPrefix,
 } from '../lib/runtime-mode';
 
@@ -11,6 +12,14 @@ test('retires captive portal UI without matching the portal node administration 
   assert.equal(matchesPathPrefix('/temas-portal/editor/abc', RETIRED_CAPTIVE_UI_PATHS), true);
   assert.equal(matchesPathPrefix('/portales', RETIRED_CAPTIVE_UI_PATHS), false);
   assert.equal(matchesPathPrefix('/vcards', RETIRED_CAPTIVE_UI_PATHS), false);
+});
+
+test('only exposes login and public vcard surfaces without an admin session', () => {
+  assert.equal(isPublicUiPath('/login/reset-password'), true);
+  assert.equal(isPublicUiPath('/vcard/public-id'), true);
+  assert.equal(isPublicUiPath('/v2/vcard/public-id'), true);
+  assert.equal(isPublicUiPath('/dashboard'), false);
+  assert.equal(isPublicUiPath('/portales'), false);
 });
 
 test('keeps the portal node administration path distinct from the captive portal path', () => {

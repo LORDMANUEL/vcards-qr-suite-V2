@@ -3,6 +3,7 @@ import {
   RETIRED_CAPTIVE_API_PREFIXES,
   RETIRED_CAPTIVE_UI_PATHS,
   isVcardsOnlyMode,
+  isPublicUiPath,
   matchesPathPrefix,
 } from './lib/runtime-mode';
 
@@ -87,6 +88,12 @@ export function middleware(req: NextRequest) {
 
   if (pathname.startsWith('/api/')) {
     return NextResponse.next();
+  }
+
+  if (!isPublicUiPath(pathname) && !hasSessionCookie(req)) {
+    const loginUrl = new URL('/login', req.url);
+    if (pathname !== '/') loginUrl.searchParams.set('callbackUrl', `${pathname}${search}`);
+    return NextResponse.redirect(loginUrl);
   }
 
   // Entrada exclusiva del panel VCards.
