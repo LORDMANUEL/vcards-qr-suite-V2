@@ -3,12 +3,16 @@ export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { canManageThemes } from '@/lib/permissions';
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     try {
         const session = await getServerSession(authOptions);
         if (!session || !session.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        if (!canManageThemes(String(session.user.role))) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         const banner = await prisma.banner.findUnique({
@@ -31,6 +35,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         const session = await getServerSession(authOptions);
         if (!session || !session.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        if (!canManageThemes(String(session.user.role))) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         const body = await req.json();
@@ -58,6 +65,9 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
         const session = await getServerSession(authOptions);
         if (!session || !session.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        if (!canManageThemes(String(session.user.role))) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         await prisma.banner.delete({
