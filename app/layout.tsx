@@ -6,8 +6,8 @@ import { Providers } from './providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Ford Yude Canahuati - Portal Cautivo',
-  description: 'Sistema de gestión de vCards y códigos QR',
+  title: 'YUDE VCards',
+  description: 'Administración empresarial de vCards y códigos QR',
 };
 
 export default function RootLayout({

@@ -50,19 +50,9 @@ const menuGroups = [
     ]
   },
   {
-    name: 'Portales Cautivos',
-      items: [
-        { name: 'Usuarios Conectados', icon: Wifi, href: '/usuarios' },
-        { name: 'Temas Portales', icon: Palette, href: '/temas-portal' },
-        { name: 'Sucursales Portal', icon: MapPin, href: '/portales/sucursales' },
-        { name: 'Links Portales', icon: LinkIcon, href: '/links' },
-        { name: 'Promociones', icon: Megaphone, href: '/promociones' },
-        { name: 'Reportes Portal', icon: BarChart3, href: '/reportes?tab=portal' },
-      ]
-  },
-  {
     name: 'Sistema',
     items: [
+      { name: 'Administración de portales', icon: Globe, href: '/portales' },
       { name: 'Gestión Usuarios', icon: UserCog, href: '/usuarios-admin' },
       { name: 'Temas Admin', icon: Palette, href: '/temas-admin' },
       { name: 'BD Manager', icon: Database, href: '/backup' },
@@ -90,8 +80,8 @@ export function Sidebar() {
     <div className="h-screen w-64 bg-white border-r border-gray-200 flex flex-col">
       {/* Header */}
       <div className="p-6 border-b border-gray-200">
-        <h1 className="text-xl font-bold text-[#003478]">Ford Admin</h1>
-        <p className="text-sm text-gray-600 mt-1">Portal Cautivo</p>
+        <h1 className="text-xl font-bold text-[#003478]">YUDE VCards</h1>
+        <p className="text-sm text-gray-600 mt-1">Administración empresarial</p>
       </div>
 
       {/* Menu Items */}

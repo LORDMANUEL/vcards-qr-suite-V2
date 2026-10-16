@@ -77,8 +77,8 @@ export default function LoginPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
           </div>
-          <h1>Ford Yude Canahuati</h1>
-          <p>Portal Cautivo</p>
+          <h1>YUDE VCards</h1>
+          <p>Administración empresarial</p>
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
@@ -86,11 +86,12 @@ export default function LoginPage() {
             <label htmlFor="email">Correo Electronico</label>
             <input
               id="email"
+              name="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="ejemplo@fordyude.hn"
+              placeholder="usuario@empresa.com"
               autoComplete="username"
             />
           </div>
@@ -99,6 +100,7 @@ export default function LoginPage() {
             <label htmlFor="password">Contrasena</label>
             <input
               id="password"
+              name="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -112,6 +114,7 @@ export default function LoginPage() {
             <label htmlFor="otp">Codigo autenticador (si aplica)</label>
             <input
               id="otp"
+              name="otp"
               type="text"
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
@@ -133,7 +136,7 @@ export default function LoginPage() {
         </form>
 
         <div className={styles.footer}>
-          <p>Copyright 2025 Ford Yude Canahuati</p>
+          <p>Copyright 2026 Grupo Yude Canahuati</p>
           <p>Todos los derechos reservados</p>
         </div>
       </section>
