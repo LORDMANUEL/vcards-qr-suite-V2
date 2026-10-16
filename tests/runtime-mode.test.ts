@@ -13,6 +13,11 @@ test('retires captive portal UI without matching the portal node administration 
   assert.equal(matchesPathPrefix('/vcards', RETIRED_CAPTIVE_UI_PATHS), false);
 });
 
+test('keeps the portal node administration path distinct from the captive portal path', () => {
+  assert.equal('/portales'.startsWith('/portal/'), false);
+  assert.equal('/portal/session'.startsWith('/portal/'), true);
+});
+
 test('retires captive portal APIs without affecting vcard APIs', () => {
   assert.equal(matchesPathPrefix('/api/portal/register', RETIRED_CAPTIVE_API_PREFIXES), true);
   assert.equal(matchesPathPrefix('/api/access-points/node-1', RETIRED_CAPTIVE_API_PREFIXES), true);

@@ -103,7 +103,7 @@ export function middleware(req: NextRequest) {
   const queryKeys = Array.from(new Set(req.nextUrl.searchParams.keys())).join(',');
   console.log(`[Middleware] Path: ${pathname}, HostHeader: ${hostHeader}, reqHost: ${reqHost}, queryKeys: ${queryKeys || 'none'}`);
 
-  const portalFlowPath = pathname === '/' || pathname.startsWith('/portal') || pathname.startsWith('/acceso');
+  const portalFlowPath = pathname === '/' || pathname === '/portal' || pathname.startsWith('/portal/') || pathname === '/acceso' || pathname.startsWith('/acceso/');
   const malformed = hasMalformedPath(pathname) || isRepeatedHostPath(pathname, [reqHost, canonicalHost]);
   
   // Linksys normalization
