@@ -10,8 +10,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Correo invalido' }, { status: 400 });
     }
 
-    const result = await issuePasswordReset(email);
-    return NextResponse.json({ message: result.message });
+    await issuePasswordReset(email);
+    return NextResponse.json({ message: 'Si el correo existe, enviamos instrucciones de recuperacion.' });
   } catch (error) {
     console.error('forgot-password error:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });

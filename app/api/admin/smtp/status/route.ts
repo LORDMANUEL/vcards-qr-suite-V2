@@ -14,7 +14,7 @@ export async function GET() {
   return NextResponse.json({
     host: process.env.SMTP_HOST || '',
     port: Number(process.env.SMTP_PORT || '0'),
-    user: process.env.SMTP_USER || '',
+    user: process.env.SMTP_USER ? 'Configurado' : '',
     from: process.env.SMTP_FROM || process.env.SMTP_USER || '',
     secure: Number(process.env.SMTP_PORT || '587') === 465,
     configured: Boolean(process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS),

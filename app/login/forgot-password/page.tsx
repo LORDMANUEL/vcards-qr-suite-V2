@@ -37,7 +37,7 @@ export default function ForgotPasswordPage() {
     <main className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
       <section className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-slate-200">
         <h1 className="text-2xl font-black text-slate-900">Acceso al sistema</h1>
-        <p className="text-sm text-slate-600 mt-2">Ingresa tu correo y te enviaremos una <b>contraseña temporal</b> para ingresar al panel.</p>
+        <p className="text-sm text-slate-600 mt-2">Ingresa tu correo y te enviaremos un enlace de recuperación válido durante 30 minutos.</p>
 
         <form onSubmit={onSubmit} className="mt-5 space-y-4">
           <div>
@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
             disabled={loading}
             className="w-full rounded-xl bg-blue-700 py-2.5 font-bold text-white hover:bg-blue-800 disabled:opacity-60"
           >
-            {loading ? 'Enviando...' : 'Enviar contraseña temporal'}
+            {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
           </button>
         </form>
 

@@ -1,33 +1,38 @@
 import { prisma } from '@/lib/prisma';
-import { isValidEmail } from '@/lib/auth-security';
+import { hashToken } from '@/lib/auth-security';
 import { sendMail } from '@/lib/mailer';
-import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>'"]/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+  })[character] || character);
+}
 
 export async function issuePasswordReset(email: string) {
   const normalizedEmail = String(email).trim().toLowerCase();
   const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
-  if (!user) {
+  if (!user || !user.isSystemUser || !user.isActive) {
     return { ok: true, sent: false, message: 'Si el correo existe, enviamos instrucciones de recuperacion.' };
   }
 
-  // Generar contraseña temporal legible pero segura
-  const tempPassword = `Ford-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-  const hashedPassword = await bcrypt.hash(tempPassword, 10);
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashToken(resetToken);
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
-  // Actualizar la contraseña directamente
   await prisma.user.update({
     where: { id: user.id },
     data: {
-      password: hashedPassword,
-      resetPasswordToken: null,
-      resetPasswordExpires: null,
+      resetPasswordToken: tokenHash,
+      resetPasswordExpires: expiresAt,
     },
   });
 
   const baseUrl = process.env.NEXTAUTH_URL || process.env.APP_URL || 'https://vcard.grupoyc.com';
-  const loginUrl = `${baseUrl}/login`;
+  const resetUrl = new URL('/login/reset-password', baseUrl);
+  resetUrl.searchParams.set('token', resetToken);
+  const safeName = escapeHtml(user.name);
 
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 16px;">
@@ -36,19 +41,12 @@ export async function issuePasswordReset(email: string) {
         <p style="color: #64748b; font-size: 14px;">YC VCard System - Ford Yude Canahuati</p>
       </div>
       
-      <p>Hola <b>\${user.name}</b>,</p>
-      <p>Hemos restablecido tu acceso al sistema. Aquí tienes tus nuevas credenciales temporales:</p>
-      
-      <div style="background-color: #f8fafc; padding: 16px; border-radius: 12px; margin: 20px 0; text-align: center; border: 1px dashed #cbd5e1;">
-        <p style="margin: 0; color: #64748b; font-size: 12px; text-transform: uppercase; font-weight: bold;">Contraseña Temporal</p>
-        <p style="margin: 8px 0 0; font-family: monospace; font-size: 24px; color: #0f172a; font-weight: bold; letter-spacing: 2px;">\${tempPassword}</p>
-      </div>
-
-      <p style="color: #e11d48; font-size: 13px; font-weight: bold;">IMPORTANTE: Cambia esta contraseña inmediatamente después de ingresar por seguridad.</p>
+      <p>Hola <b>${safeName}</b>,</p>
+      <p>Recibimos una solicitud para restablecer tu acceso. El enlace es válido durante 30 minutos y solo puede utilizarse una vez.</p>
 
       <div style="text-align: center; margin-top: 32px;">
-        <a href="\${loginUrl}" style="background-color: #003478; color: white; padding: 14px 28px; text-decoration: none; font-weight: bold; border-radius: 12px; display: inline-block;">
-          Ingresar al Panel Administrativo
+        <a href="${resetUrl.toString()}" style="background-color: #003478; color: white; padding: 14px 28px; text-decoration: none; font-weight: bold; border-radius: 12px; display: inline-block;">
+          Crear nueva contraseña
         </a>
       </div>
 
@@ -59,8 +57,8 @@ export async function issuePasswordReset(email: string) {
 
   const sent = await sendMail({
     to: normalizedEmail,
-    subject: 'Nueva contraseña temporal - YC VCard System',
-    text: `Hola \${user.name}. Tu contraseña temporal es: \${tempPassword}. Ingresa en: \${loginUrl}`,
+    subject: 'Restablecer acceso - YC VCard System',
+    text: `Hola ${user.name}. Usa este enlace durante los proximos 30 minutos para crear una nueva contrasena: ${resetUrl.toString()}`,
     html: htmlContent,
   });
 
@@ -68,8 +66,7 @@ export async function issuePasswordReset(email: string) {
     ok: true,
     sent,
     message: sent
-      ? 'Nueva contraseña enviada correctamente al correo.'
-      : 'Se generó la contraseña pero hubo un error al enviar el correo.',
-    tempPassword,
+      ? 'Si el correo existe, enviamos instrucciones de recuperacion.'
+      : 'No se pudo enviar el correo de recuperacion. Contacta al administrador.',
   };
 }
