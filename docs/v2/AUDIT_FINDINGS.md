@@ -1,5 +1,20 @@
 # Auditoría integral — Hallazgos VCards
 
+## Corte de remediación — 2026-10-20
+
+Hallazgos confirmados y corregidos en la rama aislada:
+
+- **P0 — secretos de usuario expuestos:** las respuestas podían incluir token de recuperación y secreto 2FA. Se excluyeron explícitamente y se restringieron consultas por rol/sucursal.
+- **P0 — portal cautivo todavía escribible:** sus rutas quedan en `410 Gone` cuando `VCARDS_ONLY_MODE=true`; 9301 no fue modificado.
+- **P0 — contenido activo almacenado:** HTML público se ejecutaba en el documento principal. Ahora se renderiza en iframe sin capacidades y los embeds validan protocolo y sandbox.
+- **P1 — importación multempresa ambigua:** nombre o ciudad podían resolver otra sucursal. Ahora se exige ID o combinación empresa/nombre/ciudad y se aplica alcance por rol.
+- **P1 — recuperación insegura:** cambiaba la contraseña antes de entregar el correo y enviaba contraseña temporal. Ahora emite token hash de un solo uso por 30 minutos.
+- **P1 — controles falsos:** Configuración afirmaba aplicar políticas, rate limit y SSL sin persistencia. Esos controles se retiraron y la interfaz solo muestra estado comprobable.
+- **P1 — borrado huérfano:** eliminar empresa desligaba sucursales. Ahora se rechaza con `409` mientras existan dependencias.
+- **P1 — pérdida de datos al editar empresa:** direcciones y slugs de sucursales no se cargaban y podían sobrescribirse vacíos. El DTO y el formulario preservan esos campos.
+
+Validación disponible: 12/12 pruebas, typecheck y build aprobados tanto localmente como en `/home/yc/vcards-v2-work-20261016`. No equivale todavía a aprobación de producción: faltan pruebas autenticadas por rol, dependencias críticas, cabeceras del proxy y regresión final.
+
 ## Ampliación de alcance — 2026-10-16
 
 La plataforma 9306 no se reduce a `/v2/vcard/[id]`: el inventario actual contiene 45 pantallas, 49 endpoints API, middleware, autenticación NextAuth, Prisma/PostgreSQL, administración organizacional, usuarios, auditoría, respaldos, temas, marketing, reportes, VCards y código legado de portal cautivo. Por instrucción del propietario, la corrección de VCards queda al final; primero se valida y endurece la plataforma completa.

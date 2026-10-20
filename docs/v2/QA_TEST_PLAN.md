@@ -1,5 +1,20 @@
 # QA Test Plan — VCards V2
 
+## Ejecución incremental — 2026-10-20
+
+| Control | Resultado |
+|---|---|
+| Unitarias | 12/12 aprobadas localmente y en VM aislada |
+| Typecheck | Aprobado sin errores |
+| Lint | Sin errores; continúan advertencias heredadas de imágenes y Hooks |
+| Build | Aprobado en Windows y Linux/VM, 48/48 páginas generadas |
+| Acceso anónimo | API administrativas devuelven 401/403; superficies administrativas redirigen a login |
+| Portal cautivo retirado | API retiradas devuelven 410 en modo VCards |
+| PostgreSQL | Sin migraciones, seeds ni escrituras de QA |
+| Producción | 9301 y 9306 sin cambios |
+
+Pendiente para criterio de salida: matriz autenticada por cada rol, recuperación de correo con buzón de prueba, importación con base aislada, pruebas de dependencias actualizadas y revisión visual final de toda la plataforma.
+
 ## Estado y límites
 
 Este plan distingue evidencia observada el 14 de octubre de 2026 de validaciones pendientes. La auditoría remota fue de solo lectura: no se ejecutaron builds, linters, scripts que escriben PostgreSQL, reinicios ni despliegues. El portal cautivo 9301 se inspeccionó únicamente con GET/HEAD y no se modificó.

@@ -1,5 +1,22 @@
 # Changelog V2
 
+## 2026-10-20 — Reparación transversal de plataforma
+
+- Protegidas las páginas administrativas y filtrada la navegación por rol.
+- Retiradas en modo VCards las rutas y API del portal cautivo; `Administración de portales` queda como acceso a nodos externos.
+- Corregido el alcance por sucursal en dashboard, reportes, usuarios, empresas, sucursales, exportaciones e importaciones.
+- Eliminada la exposición de IP, agente de navegador, secretos 2FA y tokens de recuperación en respuestas administrativas.
+- Endurecida la creación empresa → ciudad → sucursal: validación de pertenencia, duplicados y conservación de dirección/slug al editar.
+- Bloqueado el uso de correos administrativos para vCards y la selección ambigua de sucursales durante importaciones.
+- Limitadas importaciones a 5 MB y 1000 filas; los usuarios no globales solo pueden importar a su propia sucursal.
+- Sustituida la contraseña temporal por enlace de recuperación de un solo uso con vencimiento de 30 minutos.
+- Retirados el envío masivo con destinatarios fijos y la exposición del usuario SMTP.
+- Reemplazados los controles simulados de configuración, portal cautivo y SSL por una pantalla de estado real.
+- Aislado el HTML configurable y validados protocolos de iframes, mapas y botones externos.
+- Verificados 12/12 tests, typecheck, lint sin errores y build en local y VM aislada.
+
+No se ejecutaron migraciones, seeds ni escrituras de QA en PostgreSQL. Producción 9306 y el servicio 9301 permanecen sin cambios.
+
 ## 2026-10-16 — Reparación funcional validada en VM aislada
 
 - Añadida selección encadenada Empresa → Ciudad → Sucursal en creación y edición de vCards, con auto-selección cuando solo existe una opción.
