@@ -34,6 +34,9 @@ interface Company {
 export default function VcardCompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
+  const [orphanBranches, setOrphanBranches] = useState<Array<{id: string; name: string; city?: string | null; companyName?: string | null}>>([]);
+  const [orphanBranchId, setOrphanBranchId] = useState('');
+  const [linkingBranch, setLinkingBranch] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showBranchModal, setShowBranchModal] = useState(false);
   const [editing, setEditing] = useState<Company | null>(null);
@@ -51,12 +54,14 @@ export default function VcardCompaniesPage() {
   const [branchForm, setBranchForm] = useState({ city: '', address: '', uniqueSlug: '' });
 
   const loadData = async () => {
-    const [companiesRes, themesRes] = await Promise.all([
+    const [companiesRes, themesRes, branchesRes] = await Promise.all([
       fetch('/api/companies').then((r) => r.json()),
       fetch('/api/themes?category=VCARD').then((r) => r.json()),
+      fetch('/api/branches').then((r) => r.json()),
     ]);
     setCompanies(companiesRes.companies || []);
     setThemes(themesRes.themes || []);
+    setOrphanBranches((branchesRes.branches || []).filter((branch: { companyId?: string | null }) => !branch.companyId));
   };
 
   useEffect(() => { loadData(); }, []);
@@ -116,19 +121,34 @@ export default function VcardCompaniesPage() {
   const saveCompany = async () => {
     const url = editing ? `/api/companies/${editing.id}` : '/api/companies';
     const method = editing ? 'PUT' : 'POST';
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
-    setShowModal(false);
-    await loadData();
+    try {
+      const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || 'No fue posible guardar la empresa');
+      setShowModal(false);
+      await loadData();
+      showToast('Empresa guardada.', 'ok');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Error al guardar empresa');
+    }
   };
 
   const deleteCompany = async (id: string) => {
-    if (!confirm('Eliminar empresa vCard?')) return;
-    await fetch(`/api/companies/${id}`, { method: 'DELETE' });
-    await loadData();
+    if (!confirm('Eliminar empresa vCard? Solo se permitirá cuando no tenga sucursales vinculadas.')) return;
+    try {
+      const response = await fetch(`/api/companies/${id}`, { method: 'DELETE' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || 'No fue posible eliminar la empresa');
+      await loadData();
+      showToast('Empresa eliminada.', 'ok');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Error al eliminar la empresa');
+    }
   };
 
   const openBranchModal = (company: Company) => {
     setSelectedCompany(company);
+    setOrphanBranchId('');
     setBranchForm({ city: '', address: '', uniqueSlug: '' });
     setShowBranchModal(true);
   };
@@ -136,7 +156,7 @@ export default function VcardCompaniesPage() {
   const createBranch = async () => {
     if (!selectedCompany || !branchForm.city) return;
     const branchName = `${selectedCompany.name} - ${branchForm.city}`;
-    await fetch('/api/branches', {
+    const response = await fetch('/api/branches', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -148,8 +168,38 @@ export default function VcardCompaniesPage() {
         uniqueSlug: branchForm.uniqueSlug || `${selectedCompany.slug || selectedCompany.name.toLowerCase()}-${branchForm.city.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
       }),
     });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      showToast(data?.error || 'No se pudo crear la sucursal');
+      return;
+    }
     setShowBranchModal(false);
     await loadData();
+  };
+
+  // Explicit, administrator-approved association; no guessing by city or companyName.
+  const linkExistingBranch = async () => {
+    if (!selectedCompany || !orphanBranchId || linkingBranch) return;
+    const orphan = orphanBranches.find((branch) => branch.id === orphanBranchId);
+    if (!orphan) return;
+    if (!confirm(`¿Vincular la sucursal existente "${orphan.name}" (ID ${orphan.id}) a "${selectedCompany.name}"?\nNo se creará una sucursal nueva ni cambiará el QR.`)) return;
+    setLinkingBranch(true);
+    try {
+      const response = await fetch(`/api/branches/${orphan.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId: selectedCompany.id }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || 'No se pudo vincular la sucursal');
+      await loadData();
+      setOrphanBranchId('');
+      showToast('Sucursal existente vinculada correctamente.', 'ok');
+      setShowBranchModal(false);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Error vinculando sucursal');
+    } finally {
+      setLinkingBranch(false);
+    }
   };
 
   const deleteBranch = async (branchId: string, branchName: string) => {
