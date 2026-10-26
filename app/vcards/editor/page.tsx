@@ -4,6 +4,8 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { saveAs } from 'file-saver';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import { flushSync } from 'react-dom';
+import { CARD_WIDTH_MM, CARD_HEIGHT_MM, MIN_QR_WIDTH_MM, qrWidthMm, isStoredQrImage } from '@/lib/print-studio';
 import { Document, Packer, Paragraph, ImageRun } from 'docx';
 import { useRouter } from 'next/navigation';
 import {
@@ -62,6 +64,7 @@ interface UserOption {
   website?: string | null;
   branch?: { name: string } | null;
   qrCodeData?: string | null;
+  qrImageUrl?: string | null;
 }
 
 interface MediaItem {
@@ -103,6 +106,7 @@ interface StudioElement {
   muted?: boolean;
   loop?: boolean;
   qrValue?: string;
+  qrImageUrl?: string;
   embedUrl?: string;
   boxShadow?: string;
 }
@@ -154,7 +158,7 @@ const DEFAULT_DOC: StudioDocument = {
       backgroundColor: '#003478', borderRadius: 18,
     },
     {
-      id: 'qr-main', kind: 'qr', name: 'QR principal', x: 780, y: 145, width: 190, height: 190, rotation: 0, opacity: 1, zIndex: 4, locked: false, visible: true, allowOverlap: false,
+      id: 'qr-main', kind: 'qr', name: 'QR principal', x: 720, y: 130, width: 260, height: 260, rotation: 0, opacity: 1, zIndex: 4, locked: false, visible: true, allowOverlap: false,
       qrValue: 'https://example.com/vcard/main', borderRadius: 18, backgroundColor: '#ffffff',
     },
   ],
@@ -293,10 +297,10 @@ function EditorContent() {
   useEffect(() => {
     Promise.all([
       fetch('/api/themes?category=CARD').then((r) => r.json()).catch(() => ({ themes: [] })),
-      fetch('/api/users?kind=vcard').then((r) => r.json()).catch(() => ({ users: [] })),
+      fetch('/api/vcards').then((r) => r.json()).catch(() => ({ vcards: [] })),
     ]).then(([themeData, userData]) => {
       setThemes(themeData.themes || []);
-      setUsers(userData.users || []);
+      setUsers((userData.vcards || []).map((card: any) => ({ ...card.user, id: card.id, qrCodeData: card.qrCodeData, qrImageUrl: card.qrImageUrl, branch: card.branch })));
     });
   }, []);
 
@@ -519,16 +523,21 @@ function EditorContent() {
     setSelectedIds([]);
   };
 
-  const applyUser = (userId: string) => {
-    setSelectedUserId(userId);
-    const user = users.find((item) => item.id === userId);
-    if (!user) return;
-    setElementsForSide((elements) => elements.map((element) => {
-      if (element.name === 'Nombre') return { ...element, text: user.name };
-      if (element.name === 'Cargo') return { ...element, text: user.position || '' };
-      if (element.name === 'QR principal') return { ...element, qrValue: user.qrCodeData || user.email };
+  const applyUser = (vcardId: string) => {
+    setSelectedUserId(vcardId);
+    const card = users.find((item) => item.id === vcardId);
+    if (!card) return;
+    const patch = (elements: StudioElement[]) => elements.map((element) => {
+      if (element.name === 'Nombre') return { ...element, text: card.name };
+      if (element.name === 'Cargo') return { ...element, text: card.position || '' };
+      if (element.kind === 'qr') return {
+        ...element,
+        // The original persisted signed QR image, never UUID/email encoded as QR.
+        qrImageUrl: isStoredQrImage(card.qrImageUrl) ? card.qrImageUrl : '',
+      };
       return element;
-    }));
+    });
+    setDoc((previous) => ({ ...previous, front: patch(previous.front), back: patch(previous.back) }));
   };
 
   const saveStudio = async () => {
@@ -558,22 +567,72 @@ function EditorContent() {
 
   const layerList = useMemo(() => [...currentElements].sort((a, b) => b.zIndex - a.zIndex), [currentElements]);
 
+  const validatePrintableQr = (): boolean => {
+    const qrElements = [...doc.front, ...doc.back].filter((element) => element.kind === 'qr' && element.visible);
+    if (qrElements.length === 0) return true;
+    const selectedCard = users.find((card) => card.id === selectedUserId);
+    if (!selectedCard || !isStoredQrImage(selectedCard.qrImageUrl)) {
+      alert('Seleccione una vCard que tenga guardado su QR original y firmado antes de imprimir.');
+      return false;
+    }
+    if (qrElements.some((element) => qrWidthMm(element.width, doc.canvas.width) < MIN_QR_WIDTH_MM)) {
+      alert('El QR debe medir al menos 20 mm de ancho sobre la tarjeta CR80 para facilitar el escaneo.');
+      return false;
+    }
+    return true;
+  };
+
+  const capturePrintableSide = async (): Promise<string> => {
+    if (!canvasRef.current) throw new Error('Lienzo no disponible');
+    const image = await html2canvas(canvasRef.current, {
+      backgroundColor: null,
+      scale: 3,
+      useCORS: true,
+      onclone: (clonedDocument) => {
+        const preview = clonedDocument.getElementById('print-studio-canvas');
+        if (!preview) return;
+        preview.style.transform = 'none';
+        preview.style.boxShadow = 'none';
+        preview.style.borderRadius = '0';
+        preview.querySelectorAll('[data-print-grid],button').forEach((element) => element.remove());
+        preview.querySelectorAll('.ring-2').forEach((element) => element.classList.remove('ring-2'));
+      },
+    });
+    return image.toDataURL('image/png');
+  };
+
   const exportPng = async () => {
-    if (!canvasRef.current) return;
-    const canvas = await html2canvas(canvasRef.current, { backgroundColor: null, scale: 3, useCORS: true });
-    const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/png');
-    link.download = `${doc.name.replace(/\s+/g, '-')}-${selectedSide}.png`;
-    link.click();
+    if (!validatePrintableQr()) return;
+    try {
+      const image = await capturePrintableSide();
+      const link = document.createElement('a');
+      link.href = image;
+      link.download = `${doc.name.replace(/\s+/g, '-')}-${selectedSide}.png`;
+      link.click();
+    } catch (error) {
+      console.error('Error al exportar PNG', error);
+      alert('No se pudo generar el PNG. Revise los recursos multimedia.');
+    }
   };
 
   const exportPdf = async () => {
-    if (!canvasRef.current) return;
-    const canvas = await html2canvas(canvasRef.current, { backgroundColor: null, scale: 3, useCORS: true });
-    const image = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({ orientation: doc.canvas.width > doc.canvas.height ? 'landscape' : 'portrait', unit: 'mm', format: [85.6, 54] });
-    pdf.addImage(image, 'PNG', 0, 0, 85.6, 54);
-    pdf.save(`${doc.name.replace(/\s+/g, '-')}-${selectedSide}.pdf`);
+    if (!validatePrintableQr()) return;
+    const previousSide = selectedSide;
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [CARD_WIDTH_MM, CARD_HEIGHT_MM], compress: true });
+    try {
+      for (const [index, side] of (['front', 'back'] as SideKey[]).entries()) {
+        flushSync(() => setSelectedSide(side));
+        const image = await capturePrintableSide();
+        if (index > 0) pdf.addPage([CARD_WIDTH_MM, CARD_HEIGHT_MM], 'landscape');
+        pdf.addImage(image, 'PNG', 0, 0, CARD_WIDTH_MM, CARD_HEIGHT_MM);
+      }
+      pdf.save(`${doc.name.replace(/\s+/g, '-')}-frente-reverso-CR80.pdf`);
+    } catch (error) {
+      console.error('Error al exportar PDF doble cara', error);
+      alert('No se pudo generar el PDF doble cara. Revise los recursos multimedia.');
+    } finally {
+      flushSync(() => setSelectedSide(previousSide));
+    }
   };
 
   const exportDocx = async () => {
@@ -607,7 +666,7 @@ function EditorContent() {
           <button onClick={redo} disabled={!canRedo} className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-200 disabled:opacity-50" title="Rehacer (Ctrl+Y)"><Redo2 className="inline h-4 w-4 mr-1"/> Rehacer</button>
           <div className="h-6 w-px bg-gray-300 mx-2"></div>
           <button onClick={exportPng} className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-200">PNG</button>
-          <button onClick={exportPdf} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">PDF</button>
+          <button onClick={exportPdf} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50" title="CR80, dos páginas: frente y reverso">PDF doble cara</button>
           <button onClick={exportDocx} className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600">DOCX</button>
           <button onClick={saveStudio} className="rounded-lg bg-[#2563eb] px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">Guardar</button>
         </div>
@@ -864,6 +923,7 @@ function EditorContent() {
             <div className="mx-auto flex min-h-full items-center justify-center p-4" style={{ paddingLeft: doc.canvas.showRulers ? 32 : 16, paddingTop: doc.canvas.showRulers ? 32 : 16 }}>
               <div
                 ref={canvasRef}
+                id="print-studio-canvas"
                 className="relative overflow-hidden rounded-[28px] bg-white shadow-2xl"
                 style={{
                   width: doc.canvas.width,
@@ -887,7 +947,7 @@ function EditorContent() {
               >
                 {/* GRID */}
                 {doc.canvas.showGrid && (
-                  <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ backgroundImage: `linear-gradient(to right, rgba(59,130,246,0.18) 1px, transparent 1px), linear-gradient(to bottom, rgba(59,130,246,0.18) 1px, transparent 1px)`, backgroundSize: `${doc.canvas.gridSize}px ${doc.canvas.gridSize}px` }} />
+                  <div data-print-grid className="absolute inset-0 opacity-30 pointer-events-none" style={{ backgroundImage: `linear-gradient(to right, rgba(59,130,246,0.18) 1px, transparent 1px), linear-gradient(to bottom, rgba(59,130,246,0.18) 1px, transparent 1px)`, backgroundSize: `${doc.canvas.gridSize}px ${doc.canvas.gridSize}px` }} />
                 )}
 
                 {/* MARQUEE SELECTION RECTANGLE */}
@@ -948,7 +1008,7 @@ function EditorContent() {
                       {element.kind === 'image' && <img src={element.src} alt={element.name} className="h-full w-full" style={{ objectFit: element.objectFit, borderRadius: element.borderRadius }} />}
                       {element.kind === 'video' && <video src={element.src} className="h-full w-full" style={{ objectFit: element.objectFit, borderRadius: element.borderRadius }} autoPlay={element.autoplay} muted={element.muted} loop={element.loop} controls />}
                       {element.kind === 'embed' && <iframe src={element.embedUrl} className="h-full w-full rounded-2xl border-0 bg-white" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />}
-                      {element.kind === 'qr' && <img src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(element.qrValue || '')}`} alt={element.name} className="h-full w-full rounded-xl border border-gray-200 bg-white p-2" />}
+                      {element.kind === 'qr' && (element.qrImageUrl ? <img src={element.qrImageUrl} alt={element.name} className="h-full w-full rounded-xl border border-gray-200 bg-white p-2" /> : <div className="flex h-full w-full items-center justify-center rounded-xl border border-dashed border-red-300 bg-red-50 p-2 text-center text-xs text-red-700">Seleccione una vCard con QR original válido</div>)}
 
                       {/* RESIZE HANDLE */}
                       {isSelected && !element.locked && (
