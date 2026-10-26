@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { canManageCompanies, canManageThemes } from '@/lib/permissions';
+import { isSameCompanyScope, isVCardThemeScope, themeSlot } from '@/lib/theme-scope';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
   const scope = body?.scope;
   const targetId = body?.targetId;
   if (typeof themeId !== 'string' || !themeId || typeof targetId !== 'string' || !targetId
-      || (scope !== 'company' && scope !== 'branch')) {
+      || !isVCardThemeScope(scope)) {
     return NextResponse.json({ error: 'Indique themeId, scope (company|branch) y targetId' }, { status: 400 });
   }
 
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
         companyId = branch.companyId;
       }
 
-      if (theme.companyId && theme.companyId !== companyId) {
+      if (!isSameCompanyScope(theme.companyId, companyId)) {
         return { error: 'Este tema está asignado a otra empresa. Clónelo para reutilizar el diseño.', status: 409 } as const;
       }
       const crossCompany = {
@@ -77,7 +78,7 @@ export async function POST(req: Request) {
 
       // Do not deactivate other themes or update unrelated branches.
       await tx.theme.update({ where: { id: themeId }, data: { isActive: true, companyId } });
-      const seasonal = theme.type === 'SEASONAL' || theme.type === 'FESTIVE';
+      const seasonal = themeSlot(theme.type) === 'seasonal';
       if (scope === 'company') {
         await tx.company.update({
           where: { id: targetId },
