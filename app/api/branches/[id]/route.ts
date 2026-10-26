@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { canManageCompanies } from '@/lib/permissions';
+import { getRequestedCompanyId } from '@/lib/branch-integrity';
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     try {
@@ -81,11 +82,30 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
             vcardPositionThemeRules,
         } = body;
 
+        // Company associations are changed only by explicit, validated reassignment.
+        // Updating a theme or branch name must never null out companyId.
+        let companyPatch: { companyId?: string; companyName?: string } = {};
+        let requestedCompanyId: string | undefined;
+        try {
+            requestedCompanyId = getRequestedCompanyId(body);
+        } catch {
+            return NextResponse.json({ error: 'companyId debe ser un ID válido; no se permite desvincular desde este formulario' }, { status: 422 });
+        }
+        if (requestedCompanyId) {
+            const selectedCompany = await prisma.company.findUnique({
+                where: { id: requestedCompanyId },
+                select: { id: true, name: true },
+            });
+            if (!selectedCompany) {
+                return NextResponse.json({ error: 'Empresa seleccionada no encontrada' }, { status: 422 });
+            }
+            companyPatch = { companyId: selectedCompany.id, companyName: selectedCompany.name };
+        }
+
         const branch = await prisma.branch.update({
             where: { id: params.id },
             data: {
-                companyName,
-                companyId: companyId || null,
+                ...companyPatch,
                 name,
                 address,
                 city,
