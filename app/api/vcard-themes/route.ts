@@ -129,13 +129,8 @@ export async function PUT(request: NextRequest) {
         const normalizedName = typeof name === 'string' ? name.trim() : undefined;
 
         const theme = await prisma.$transaction(async (tx) => {
-            if (isActive === true) {
-                await tx.theme.updateMany({
-                    where: { category: 'VCARD', NOT: { id } },
-                    data: { isActive: false },
-                });
-            }
-
+            // isActive is a theme availability flag, not a unique global publication.
+            // Never deactivate themes of unrelated companies here.
             return tx.theme.update({
                 where: { id },
                 data: {
