@@ -22,7 +22,7 @@ export default async function PortalAdminPage() {
     <div className="flex h-screen overflow-hidden bg-[#f5f7fb]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <Topbar />
+        <Topbar title="Portal Manager" subtitle="Operación y administración de portales cautivos" />
         <main className="flex-1 overflow-y-auto p-5 md:p-8">
           <div className="mx-auto max-w-6xl">
             <div className="mb-8 rounded-3xl bg-[#003478] p-6 text-white shadow-lg md:p-10">
