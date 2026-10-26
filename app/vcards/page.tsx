@@ -24,6 +24,9 @@ interface VCard {
     website?: string | null;
   };
   branch?: {
+    id: string;
+    companyId?: string | null;
+    city?: string | null;
     name: string;
     address?: string | null;
   } | null;
