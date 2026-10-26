@@ -9,6 +9,7 @@ import { createAuditLog } from '@/lib/audit';
 import { canBulkImportVcards, canManageCompanies, canViewVcards } from '@/lib/permissions';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
+import { branchBelongsToCompany } from '@/lib/branch-integrity';
 
 export const dynamic = 'force-dynamic';
 
@@ -102,7 +103,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const {
-      name, email, position, phone, website, photoUrl, branchId
+      name, email, position, phone, website, photoUrl, branchId, companyId
     } = body;
 
     if (!name || !email || !branchId) {
@@ -111,6 +112,11 @@ export async function POST(request: Request) {
 
     if (!canManageCompanies(role) && session.user.branchId !== branchId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const selectedBranch = await prisma.branch.findUnique({ where: { id: branchId }, select: { id: true, companyId: true } });
+    if (!selectedBranch) return NextResponse.json({ error: 'Sucursal no encontrada' }, { status: 404 });
+    if (!selectedBranch.companyId || !branchBelongsToCompany(selectedBranch, companyId)) {
+      return NextResponse.json({ error: 'Empresa y sucursal no coinciden. Corrija su vinculación antes de crear la tarjeta.' }, { status: 422 });
     }
 
     // 1. Find or Create the Advisor User
