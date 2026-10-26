@@ -37,3 +37,19 @@ La rama se creó sin acceso a la BD o servidor; las pruebas ejecutadas desde el 
 
 ## Rollback
 Revertir el commit de la rama/PR mediante nuevo commit `git revert` y volver a desplegar solo con backup/verificación autorizada. No hacer rollback de datos porque este PR no altera el esquema ni contiene script de datos. Mantener copia del release 9306 anterior, y no reiniciar 9301.
+
+## Extensión de protección (mismo PR)
+
+Se detectaron otros dos riesgos en la API de compañías:
+- Antes: `PUT /api/companies/:id` reescribía la primera sucursal, actualizaba tema/branding de sucursales y podía crear nuevas sucursales al cambiar datos corporativos. Ahora el PUT solo modifica Company y actualiza `Branch.companyName` ante un cambio de razón social. El mantenimiento de sedes queda en `/api/branches`.
+- Antes: `DELETE /api/companies/:id` desasociaba todas las sucursales automáticamente con `companyId=null`. Ahora devuelve 409 cuando la empresa tiene sucursales. No elimina ni reasigna usuarios, QR ni histórico.
+- En `/vcards/companias`, el asistente de edición corporativa muestra Branding/Temas (no ofrece edición indirecta de sucursales).
+- La ventana Crear Sucursal permite opcionalmente **vincular una sucursal huérfana existente por ID** a la empresa seleccionada, previa confirmación. Esto ejecuta `PUT /api/branches/:id` con `companyId` explícito; no crea otro registro ni altera el código QR.
+- Es una operación de datos voluntaria en la futura interfaz productiva: debe usarse con backup, listado read-only, aprobación del mapeo origen→destino y registro de auditoría. No se ha ejecutado ninguna vinculación durante el desarrollo del PR.
+
+### Pruebas adicionales pendientes
+1. Crear empresa y sede, editar color/logotipo/nombre corporativo: la sede conserva ID, nombre, ciudad y tema propios.
+2. Intentar borrar empresa con una o varias sedes: HTTP 409 y los registros intactos.
+3. En empresa sin sucursales, localizar una sede huérfana por ID y vincularla voluntariamente; al recargar aparece bajo la empresa sin cambiar vCards/QR.
+4. Verificar que un mismo nombre de sucursal en dos empresas no causa coincidencias por nombre.
+5. Probar conflicto por cambios concurrentes y permisos insuficientes (admin/IT vs otros).
