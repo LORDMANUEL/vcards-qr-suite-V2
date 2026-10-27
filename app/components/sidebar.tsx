@@ -43,8 +43,8 @@ const menuGroups = [
     items: [
       { name: 'Generador QR/vCards', icon: QrCode, href: '/vcards' },
       { name: 'Empresas vCard', icon: Building2, href: '/vcards/companias' },
-      { name: 'Theme Builder', icon: Edit, href: '/vcards/theme-builder' },
-      { name: 'Editor Temas vCard', icon: Palette, href: '/vcards/temas' },
+      { name: 'Diseñar temas vCard', icon: Edit, href: '/vcards/theme-builder' },
+      { name: 'Publicar temas vCard', icon: Palette, href: '/vcards/temas' },
       { name: 'Editor de Tarjetas', icon: Printer, href: '/vcards/editor' },
       { name: 'Reportes de Escaneo', icon: BarChart3, href: '/reportes?tab=vcards' },
     ]
