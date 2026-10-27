@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main, fix/vcards-company-branch-integrity-20261026]
   push:
-    branches: [main, 'feat/**', 'fix/**', 'chore/**', 'integration/**']
+    branches: [main, 'feat/**', 'fix/**', 'chore/**', 'integration/**', 'test/**']
 
 permissions:
   contents: read
@@ -49,6 +49,14 @@ jobs:
         run: npm run typecheck
       - name: Unit tests
         run: npm test
+      # The target database is an ephemeral postgres:16 service within this job.
+      # NEVER copy this step into an operator's production host runbook.
+      - name: Prepare disposable CI PostgreSQL schema
+        run: npx prisma db push --skip-generate
+      - name: Database integration tests (CI-only)
+        env:
+          RUN_DB_INTEGRATION: 'true'
+        run: npx tsx --test tests/db-contract.integration.test.ts
       - name: Lint
         run: npm run lint
       - name: Production build
