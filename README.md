@@ -42,6 +42,16 @@ flowchart LR
 
 La implementación y disponibilidad de cada mejora depende de que el PR respectivo se revise, fusione y despliegue.
 
+## Rama integrada para Codex
+
+Se ha preparado `integration/vcards-v2-codex-20261026` como **candidata de pruebas conjunta de los PR #2–#9**, no como publicación automática ni como reemplazo de sus revisiones individuales. Incluye el menú unificado de VCards Studio y Portal Manager.
+
+- [Manual de integración y validación para Codex](docs/v2/INTEGRATION_CODEX_READINESS_2026-10-26.md)
+- [Preflight read-only del servidor](scripts/vcards-release-preflight.sh)
+- [CI GitHub Actions](https://github.com/LORDMANUEL/vcards-qr-suite-V2/actions)
+
+**Nota:** solo la rama integrada dispone de estos archivos hasta que se revisen y fusionen los cambios. Compilar en CI no equivale a probar los servicios 9301/9306 ni autoriza modificar la base real.
+
 ## Desarrollo local
 
 Requisitos: Node.js compatible con Next 14, PostgreSQL y variables privadas `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL` configuradas fuera del repositorio. No reutilizar valores de CI para producción.
@@ -72,6 +82,7 @@ Los cambios se revisan por fases y no deben desplegarse todos a la vez:
 | [#6](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/6) | CI, SQL read-only, manual Codex y documentación | main |
 | [#7](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/7) | Guardado reversible del Theme Builder, borradores y UX | #3 |
 | [#8](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/8) | Crear empresas sin sucursales automáticas; sedes explícitas | #2 |
+| [#9](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/9) | Temas públicos activos/fechas V1/V2 y protección contra borrado de temas utilizados | #7 |
 
 **Criterio de aceptación:** CI del SHA final aprobado, revisión de código, QA integrada (empresa Ford/GAC/Quick Lane), URLs/QR históricos, privacidad, datos reales en staging, respaldo/restauración, plan operacional y aprobación explícita. CI verde no implica pruebas E2E ni autorización de despliegue.
 
