@@ -50,7 +50,7 @@ export default function VcardCompaniesPage() {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
   };
-  const [formData, setFormData] = useState({ name: '', slug: '', logoUrl: '', primaryColor: '#003478', secondaryColor: '#FFFFFF', defaultVcardThemeId: '', seasonalVcardThemeId: '', baseCity: 'San Pedro Sula', baseAddress: '', country: 'Honduras', branches: [{ city: 'Tegucigalpa', address: '', uniqueSlug: '' }] as Array<{ city: string; address: string; uniqueSlug: string }> });
+  const [formData, setFormData] = useState({ name: '', slug: '', logoUrl: '', primaryColor: '#003478', secondaryColor: '#FFFFFF', defaultVcardThemeId: '', seasonalVcardThemeId: '', baseCity: 'San Pedro Sula', baseAddress: '', country: 'Honduras', branches: [] as Array<{ city: string; address: string; uniqueSlug: string }> });
   const [branchForm, setBranchForm] = useState({ city: '', address: '', uniqueSlug: '' });
 
   const loadData = async () => {
@@ -80,11 +80,11 @@ export default function VcardCompaniesPage() {
         baseCity: company.branches?.[0]?.city || 'San Pedro Sula',
         baseAddress: '',
         country: 'Honduras',
-        branches: company.branches?.slice(1).map((branch) => ({ city: branch.city || '', address: '', uniqueSlug: '' })) || [{ city: 'Tegucigalpa', address: '', uniqueSlug: '' }],
+        branches: [],
       });
     } else {
       setEditing(null);
-      setFormData({ name: '', slug: '', logoUrl: '', primaryColor: '#003478', secondaryColor: '#FFFFFF', defaultVcardThemeId: '', seasonalVcardThemeId: '', baseCity: 'San Pedro Sula', baseAddress: '', country: 'Honduras', branches: [{ city: 'Tegucigalpa', address: '', uniqueSlug: '' }] });
+      setFormData({ name: '', slug: '', logoUrl: '', primaryColor: '#003478', secondaryColor: '#FFFFFF', defaultVcardThemeId: '', seasonalVcardThemeId: '', baseCity: 'San Pedro Sula', baseAddress: '', country: 'Honduras', branches: [] });
     }
     setWizardStep(1);
     setShowModal(true);
@@ -424,12 +424,7 @@ export default function VcardCompaniesPage() {
                       </div>
                     </div>
                   ) : null}
-                  {!editing && (<>
-                   <input value={formData.baseCity} onChange={(e) => setFormData({ ...formData, baseCity: e.target.value })} placeholder="Ciudad base" className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-[#003478] md:col-span-2" />
-                  <input value={formData.baseAddress} onChange={(e) => setFormData({ ...formData, baseAddress: e.target.value })} placeholder="Direccion sucursal principal" className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-[#003478] md:col-span-2" />
-                  <input value={formData.country} onChange={(e) => setFormData({ ...formData, country: e.target.value })} placeholder="Pais" className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-[#003478] md:col-span-2" />
-                   </>)}
-                  <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                  {!editing && <p className="md:col-span-2 rounded-xl bg-blue-50 p-3 text-xs text-blue-700">La empresa se crea sin sucursales automáticas. Agregue las sedes nuevas en el paso 3 o vincule las existentes por su ID.</p>}                  <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
                     <Palette className="w-4 h-4 text-gray-400" />
                     <input type="color" value={formData.primaryColor} onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })} />
                     <span className="text-xs font-bold text-gray-500">Color primario</span>
@@ -460,15 +455,16 @@ export default function VcardCompaniesPage() {
                 <div className="md:col-span-2 rounded-2xl border border-gray-200 bg-gray-50 p-4">
                   <div className="mb-4 flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-black text-gray-900">Sucursales adicionales por ciudad</p>
-                      <p className="text-xs text-gray-400">La empresa tambien se crea como sucursal principal automaticamente.</p>
+                      <p className="text-sm font-black text-gray-900">Sucursales de esta empresa (opcional)</p>
+                      <p className="text-xs text-gray-400">No se crean sucursales automáticas. Agregue solo sedes nuevas; las existentes se vinculan por ID.</p>
                     </div>
                     <button type="button" onClick={addDraftBranch} className="rounded-xl bg-[#003478] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white">
                       <Plus className="mr-1 inline w-3 h-3" /> Agregar ciudad
                     </button>
                   </div>
                   <div className="space-y-3">
-                    {formData.branches.map((branch, index) => (
+                    {formData.branches.length === 0 && <p className="mb-3 text-xs text-gray-500">Sin sucursales nuevas: puede guardar solamente la empresa.</p>}
+                     {formData.branches.map((branch, index) => (
                       <div key={`draft-branch-${index}`} className="grid grid-cols-1 gap-3 rounded-2xl border border-gray-200 bg-white p-4 md:grid-cols-[1fr_1.2fr_1fr_auto]">
                         <input value={branch.city} onChange={(e) => updateDraftBranch(index, { city: e.target.value })} placeholder="Ciudad" className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-[#003478]" />
                         <input value={branch.address} onChange={(e) => updateDraftBranch(index, { address: e.target.value })} placeholder="Direccion" className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-[#003478]" />
