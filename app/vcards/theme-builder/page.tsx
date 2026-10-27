@@ -1104,7 +1104,7 @@ function EditorContent() {
   const loadSavedTheme = (theme: any) => {
     const originalStudioDoc = themeStudioDocument(theme.config);
     if (originalStudioDoc) {
-      setDoc(originalStudioDoc as StudioDocument);
+      setDoc(originalStudioDoc as unknown as StudioDocument);
       setThemeName(theme.name);
       setEditingThemeId(theme.id);
       setShowThemeSelector(false);
