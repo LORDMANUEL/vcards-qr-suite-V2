@@ -65,9 +65,11 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
             position,
             phone,
             website,
-            branchId: branchId || null,
-            photoUrl: photoUrl || null,
-            isActive: isActive !== undefined ? isActive : true,
+            // Omitted fields must preserve the existing account state:
+            // never silently reactivate an inactive user, move branches or erase photo.
+            ...(branchId !== undefined ? { branchId: branchId || null } : {}),
+            ...(photoUrl !== undefined ? { photoUrl: photoUrl || null } : {}),
+            ...(isActive !== undefined ? { isActive } : {}),
         };
 
         if (password) {
