@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { explicitCompanyBranches } from '@/lib/company-onboarding';
+import { isScopedDirectoryAllowed, scopedDirectoryBranchId } from '@/lib/directory-scope';
 import { isUnusedCompanyTheme } from '@/lib/company-theme-policy';
 
 function slugify(value: string) {
@@ -41,8 +42,12 @@ async function ensureCompanyDefaultTheme(tx: any, body: any) {
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const role = String(session.user.role);
+  const branchId = scopedDirectoryBranchId(role, session.user.branchId);
+  if (!isScopedDirectoryAllowed(branchId)) return NextResponse.json({ error: 'Sin sucursal asignada' }, { status: 403 });
 
   const companies = await prisma.company.findMany({
+    ...(branchId ? { where: { branches: { some: { id: branchId } } } } : {}),
     orderBy: { createdAt: 'desc' },
     include: {
       defaultVcardTheme: { select: { id: true, name: true } },
