@@ -52,16 +52,7 @@ export function CreateVCardModal({ isOpen, onClose, onSuccess }: CreateVCardModa
 
       if (branchResponse.ok) {
         const data = await branchResponse.json();
-        const loadedBranches = data.branches || [];
-        setBranches(loadedBranches);
-        if (loadedBranches.length > 0 && !formData.branchId) {
-          const firstBranch = loadedBranches[0];
-          setFormData((prev) => ({
-            ...prev,
-            branchId: firstBranch.id,
-            companyId: firstBranch.companyId || prev.companyId,
-          }));
-        }
+        setBranches(data.branches || []);
       }
 
       if (companyResponse.ok) {
@@ -79,11 +70,10 @@ export function CreateVCardModal({ isOpen, onClose, onSuccess }: CreateVCardModa
     const { name, value } = e.target;
 
     if (name === 'companyId') {
-      const branchForCompany = branches.find((branch) => branch.companyId === value);
       setFormData((prev) => ({
         ...prev,
         companyId: value,
-        branchId: branchForCompany?.id || '',
+        branchId: '',
       }));
       return;
     }
@@ -104,15 +94,15 @@ export function CreateVCardModal({ isOpen, onClose, onSuccess }: CreateVCardModa
     }));
   };
 
-  const filteredBranches = branches.filter((branch) => !formData.companyId || branch.companyId === formData.companyId);
+  const filteredBranches = branches.filter((branch) => Boolean(formData.companyId) && branch.companyId === formData.companyId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    if (!formData.branchId) {
-      setError('Debe seleccionar una sucursal');
+    if (!formData.companyId || !filteredBranches.some((branch) => branch.id === formData.branchId)) {
+      setError('Seleccione una empresa y una sucursal vinculada a ella');
       setLoading(false);
       return;
     }
@@ -244,10 +234,11 @@ export function CreateVCardModal({ isOpen, onClose, onSuccess }: CreateVCardModa
                 name="branchId"
                 value={formData.branchId}
                 onChange={handleChange}
+                disabled={!formData.companyId || filteredBranches.length === 0}
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#003478] focus:border-transparent"
               >
-                <option value="">Seleccione una sucursal</option>
+                <option value="">{!formData.companyId ? 'Primero seleccione una empresa' : filteredBranches.length ? 'Seleccione una sucursal' : 'Esta empresa no tiene sucursales vinculadas'}</option>
                 {filteredBranches.map((branch) => (
                   <option key={branch.id} value={branch.id}>
                     {branch.name}{branch.city ? ` (${branch.city})` : ''}

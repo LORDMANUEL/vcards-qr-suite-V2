@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { canManageCompanies } from '@/lib/permissions';
+import { branchBelongsToCompany } from '@/lib/branch-integrity';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,7 @@ export async function PUT(
     const canManageAny = canManageCompanies(role);
 
     const body = await request.json();
-    const { name, position, email, phone, website, photoUrl, branchId } = body;
+    const { name, position, email, phone, website, photoUrl, branchId, companyId } = body;
 
     if (!name || !email || !branchId) {
       return NextResponse.json(
@@ -42,7 +43,7 @@ export async function PUT(
       );
     }
 
-    if (!canManageAny && session.user.branchId !== branchId) {
+    if (!canManageAny && (session.user.branchId !== branchId || session.user.branchId !== vcard.branchId)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -50,9 +51,13 @@ export async function PUT(
     if (!selectedBranch) {
       return NextResponse.json({ error: 'Sucursal no encontrada' }, { status: 404 });
     }
+    if (!selectedBranch.companyId || !branchBelongsToCompany(selectedBranch, companyId)) {
+      return NextResponse.json({ error: 'La sucursal no pertenece a la empresa indicada. Revise la vinculación de empresas y sucursales.' }, { status: 422 });
+    }
 
-    // Update user
-    await prisma.user.update({
+    // Updating User and vCard must be atomic.
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
       where: { id: vcard.userId },
       data: {
         name,
@@ -66,12 +71,10 @@ export async function PUT(
     });
 
     // Keep vCard tied to the selected existing branch.
-    await prisma.vCard.update({
-      where: { id: params.id },
-      data: {
-        branchId: selectedBranch.id,
-        updatedAt: new Date(),
-      },
+      await tx.vCard.update({
+        where: { id: params.id },
+        data: { branchId: selectedBranch.id },
+      });
     });
 
     const updatedVCard = await prisma.vCard.findUnique({
