@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { isValidThemeDateRange } from '@/lib/vcard-theme-calendar';
+import { themeRuntimeLayout } from '@/lib/vcard-theme-format';
 import { Sidebar } from '../../components/sidebar';
 import { Topbar } from '../../components/topbar';
 import { VCardsGuidedTour } from '../../components/vcards-guided-tour';
@@ -207,7 +208,7 @@ function VCardTemasContent() {
         <div className="flex h-screen bg-gray-50">
             <Sidebar />
             <div className="flex-1 flex flex-col overflow-hidden">
-                <Topbar title="Temas de vCard" subtitle="Diseños visuales para las páginas públicas de tarjetas digitales" />
+                <Topbar title="Publicación de temas vCard" subtitle="El diseño se crea en Theme Builder. Aquí solamente se organiza, programa y publica por empresa o sucursal." />
                 <main className="flex-1 overflow-y-auto p-8">
                     <div className="flex items-center justify-between mb-8">
                         <p className="text-sm text-gray-500">Cada tema define el diseño que verá el cliente al escanear el código QR de la tarjeta</p>
@@ -223,7 +224,7 @@ function VCardTemasContent() {
                                 data-tour-id="temas-create"
                                 className="flex items-center gap-2 px-6 py-3 bg-[#003478] hover:bg-[#002557] text-white rounded-2xl font-bold shadow-lg shadow-blue-100 transition-all text-sm"
                             >
-                                <Plus className="w-4 h-4" /> Crear Tema
+                                <Plus className="w-4 h-4" /> Diseñar tema
                             </button>
                         </div>
                     </div>
@@ -238,10 +239,10 @@ function VCardTemasContent() {
                                 <LayoutTemplate className="w-10 h-10 text-[#003478]" />
                             </div>
                             <h3 className="text-xl font-bold text-gray-800 mb-2">Sin temas vCard</h3>
-                            <p className="text-gray-500 mb-6">Crea el primer tema con el VCard Theme Builder</p>
+                            <p className="text-gray-500 mb-6">Diseñe su primera plantilla en Theme Builder y luego publíquela aquí</p>
                             <button onClick={() => router.push('/vcards/theme-builder')}
                                 className="inline-flex items-center gap-2 px-6 py-3 bg-[#003478] text-white rounded-2xl font-bold hover:bg-[#002557]">
-                                <Plus className="w-4 h-4" /> Abrir Theme Builder
+                                <Plus className="w-4 h-4" /> Diseñar tema
                             </button>
                         </div>
                     ) : (
@@ -250,7 +251,7 @@ function VCardTemasContent() {
                                 const colors = parseColors(theme.colors);
                                 const primary = colors?.primary || '#003478';
                                 const accent = colors?.accent || '#10b981';
-                                const blocks: any[] = Array.isArray(theme.config) ? theme.config : [];
+                                const blocks = themeRuntimeLayout(theme.config);
                                 return (
                                     <div key={theme.id} data-tour-id="temas-card" className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-lg transition-all">
                                         {/* Preview */}
@@ -294,7 +295,7 @@ function VCardTemasContent() {
                                                 <button
                                                     onClick={() => router.push(`/vcards/theme-builder?themeId=${theme.id}`)}
                                                     className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-700 transition-colors">
-                                                    <Edit2 className="w-3.5 h-3.5" /> Editar
+                                                    <Edit2 className="w-3.5 h-3.5" /> Abrir diseñador
                                                 </button>
                                                 {(
                                                     <button onClick={() => openActivate(theme)} data-tour-id="temas-activate"
