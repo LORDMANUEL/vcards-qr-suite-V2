@@ -107,29 +107,53 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        // Check if user exists
-        const existingUser = await prisma.user.findUnique({
-            where: { id: params.id },
-        });
-
-        if (!existingUser) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        // Do not allow a user to remove their own session-bearing account.
+        if (session.user.id === params.id) {
+            return NextResponse.json({ error: 'No puede eliminar su propia cuenta desde esta sesión.' }, { status: 409 });
         }
 
-        await prisma.user.delete({
+        // VCard.user uses onDelete: Cascade, and Scan.vcard also cascades.
+        // This guard includes active and archived vCards and preserves all analytics.
+        const existingUser = await prisma.user.findUnique({
             where: { id: params.id },
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                _count: { select: { vcards: true } },
+            },
         });
+        if (!existingUser) {
+            return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
+        }
 
-        // Audit Log
-        await prisma.auditLog.create({
-            data: {
-                userId: session.user.id,
-                action: 'DELETED',
-                entityName: 'User',
-                entityId: params.id,
-                details: JSON.stringify({ email: existingUser.email, name: existingUser.name }),
-            }
-        });
+        if (existingUser._count.vcards > 0) {
+            return NextResponse.json({
+                code: 'USER_HAS_VCARDS',
+                error: 'No puede eliminar este usuario: tiene vCards activas o archivadas y se perderían sus QR y escaneos. Desactive la cuenta o siga el procedimiento de retención aprobado.',
+                vcards: existingUser._count.vcards,
+            }, { status: 409 });
+        }
+
+        // Zero-card users may be deleted by authorized administrators. Any
+        // concurrent new VCard should make the deletion fail through FK/transaction
+        // constraints; production cleanup still requires change control.
+        await prisma.user.delete({ where: { id: params.id } });
+
+        try {
+            await prisma.auditLog.create({
+                data: {
+                    userId: session.user.id,
+                    action: 'DELETED',
+                    entityName: 'User',
+                    entityId: params.id,
+                    details: JSON.stringify({ email: existingUser.email, name: existingUser.name }),
+                },
+            });
+        } catch (auditError) {
+            // The deletion has already committed; do not report a false 500.
+            console.error('Usuario eliminado, no se pudo registrar la auditoría:', auditError);
+        }
 
         return NextResponse.json({ message: 'User deleted successfully' });
     } catch (error) {
