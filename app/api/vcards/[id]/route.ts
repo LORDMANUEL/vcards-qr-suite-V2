@@ -114,62 +114,79 @@ export async function PUT(
   }
 }
 
+/**
+ * Archive is reversible. Never delete the VCard row or cascade-delete Scan
+ * history: its qrCodeData, signed QR image and reports are historical records.
+ */
 export async function DELETE(
-  request: Request,
+  _request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
+    if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     if (!canManageCompanies(String(session.user.role))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json({ error: 'Sin permiso para archivar vCards' }, { status: 403 });
     }
 
-    const { searchParams } = new URL(request.url);
-    const forceDelete = searchParams.get('force') === '1';
-
-    const vcard = await prisma.vCard.findUnique({
-      where: { id: params.id },
-      include: {
-        _count: {
-          select: {
-            scans: true,
-          },
-        },
-      },
+    const result = await prisma.vCard.updateMany({
+      where: { id: params.id, isActive: true },
+      data: { isActive: false },
     });
-
-    if (!vcard) {
-      return NextResponse.json(
-        { error: 'vCard no encontrada' },
-        { status: 404 }
-      );
+    if (result.count === 0) {
+      const existing = await prisma.vCard.findUnique({
+        where: { id: params.id }, select: { id: true, isActive: true },
+      });
+      if (!existing) return NextResponse.json({ error: 'vCard no encontrada' }, { status: 404 });
+      return NextResponse.json({ archived: true, alreadyArchived: true, id: params.id });
     }
 
-    if (!forceDelete && vcard._count.scans > 0) {
-      return NextResponse.json(
-        {
-          error: 'No se puede borrar la vCard porque tiene historial de escaneos. Usa force=1 si deseas eliminarla de forma definitiva.',
-          scans: vcard._count.scans,
-        },
-        { status: 409 }
-      );
-    }
-
-    await prisma.vCard.delete({
-      where: { id: params.id },
+    return NextResponse.json({
+      archived: true,
+      id: params.id,
+      message: 'vCard archivada. El QR anterior queda deshabilitado; escaneos y métricas se conservaron.',
     });
-
-    return NextResponse.json({ message: 'vCard eliminada exitosamente' });
   } catch (error) {
-    console.error('Error deleting vCard:', error);
-    return NextResponse.json(
-      { error: 'Error al eliminar vCard' },
-      { status: 500 }
-    );
+    console.error('Error archivando vCard:', error);
+    return NextResponse.json({ error: 'No se pudo archivar la vCard' }, { status: 500 });
+  }
+}
+
+/** Restore existing signed QR without generating another URL or deleting stats. */
+export async function PATCH(
+  _request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    if (!canManageCompanies(String(session.user.role))) {
+      return NextResponse.json({ error: 'Sin permiso para restaurar vCards' }, { status: 403 });
+    }
+
+    const existing = await prisma.vCard.findUnique({
+      where: { id: params.id },
+      select: { id: true, isActive: true, qrCodeData: true, user: { select: { isActive: true } } },
+    });
+    if (!existing) return NextResponse.json({ error: 'vCard no encontrada' }, { status: 404 });
+    if (!existing.user.isActive) {
+      return NextResponse.json({ error: 'El usuario está inactivo. Reactívelo con autorización antes de restaurar su tarjeta.' }, { status: 409 });
+    }
+    if (existing.isActive) return NextResponse.json({ restored: true, alreadyActive: true, id: params.id });
+    const result = await prisma.vCard.updateMany({
+      where: { id: params.id, isActive: false },
+      data: { isActive: true },
+    });
+    if (result.count === 0) {
+      return NextResponse.json({ error: 'La vCard cambió durante la restauración. Recargue la página.' }, { status: 409 });
+    }
+    return NextResponse.json({
+      restored: true,
+      id: params.id,
+      message: 'vCard restaurada con su mismo QR y con el historial original.',
+    });
+  } catch (error) {
+    console.error('Error restaurando vCard:', error);
+    return NextResponse.json({ error: 'No se pudo restaurar la vCard' }, { status: 500 });
   }
 }
