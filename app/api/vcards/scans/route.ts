@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { canViewVcards } from '@/lib/permissions';
 import { parseScanReportQuery } from '@/lib/scan-query';
 import { validateScanEvent } from '@/lib/scan-event';
+import { canReadScanReport } from '@/lib/scan-report-policy';
 
 const RATE_LIMIT_MS = 60000;
 const configuredLimit = Number(process.env.VCARD_MAX_SCANS_PER_MINUTE || 15);
@@ -99,6 +100,14 @@ export async function GET(request: NextRequest) {
   if (!query.ok) return NextResponse.json({ error: query.error }, { status: 400 });
   const { page, limit, from, to } = query;
   if (!vcardId) return NextResponse.json({ error: 'vcardId is required' }, { status: 400 });
+
+  // Restrict analytics to the caller's own branch, unless a privileged
+  // administrator is explicitly permitted to see company-wide data.
+  const requested = await prisma.vCard.findUnique({ where: { id: vcardId }, select: { id: true, branchId: true } });
+  if (!requested) return NextResponse.json({ error: 'vCard no encontrada' }, { status: 404 });
+  if (!canReadScanReport(String(session.user.role), session.user.branchId, requested.branchId)) {
+    return NextResponse.json({ error: 'Sin permiso para consultar escaneos de otra sucursal' }, { status: 403 });
+  }
 
   try {
     const dateFilter = {
