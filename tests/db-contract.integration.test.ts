@@ -10,6 +10,15 @@ import { prisma } from '../lib/prisma';
 test('PostgreSQL contract: multi-company branches, vCard transaction and theme FK integrity',
   { skip: process.env.RUN_DB_INTEGRATION !== 'true' },
   async () => {
+    // Defense in depth: refuse to write anywhere but GitHub Actions' disposable
+    // local vcards_ci database, even if RUN_DB_INTEGRATION was set accidentally.
+    const connection = new URL(process.env.DATABASE_URL || '');
+    if (process.env.CI !== 'true'
+        || connection.hostname !== '127.0.0.1'
+        || connection.port !== '5432'
+        || connection.pathname !== '/vcards_ci') {
+      throw new Error('Bloqueado: estas pruebas requieren PostgreSQL efímero de CI en 127.0.0.1:5432/vcards_ci');
+    }
     const suffix = randomUUID().slice(0, 10);
     let companyId: string | undefined;
     let branchId: string | undefined;
