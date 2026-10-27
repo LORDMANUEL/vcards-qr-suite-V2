@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { explicitCompanyBranches } from '@/lib/company-onboarding';
+import { isUnusedCompanyTheme } from '@/lib/company-theme-policy';
 
 function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -14,9 +15,8 @@ async function ensureCompanyDefaultTheme(tx: any, body: any) {
 
   const themeName = `${body.name} Corporativo`;
   const colors = JSON.stringify({ primary: body.primaryColor || '#003478', secondary: body.secondaryColor || '#FFFFFF', accent: '#10B981' });
-  const existing = await tx.theme.findFirst({ where: { name: themeName, category: 'VCARD' }, select: { id: true } });
-  if (existing) return existing.id;
-
+  // Do not reuse a theme by display name across companies. Each new
+  // company's draft must have an independent ID to prevent cross-brand edits.
   const createdTheme = await tx.theme.create({
     data: {
       name: themeName,
@@ -89,6 +89,26 @@ export async function POST(req: Request) {
 
   try {
     const company = await prisma.$transaction(async (tx) => {
+    // References to existing themes are legal only when unused and unowned.
+    // Themes in another company's published cards must first be cloned.
+    const themeIds = [body.defaultVcardThemeId, body.seasonalVcardThemeId]
+      .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
+    if (themeIds.length) {
+      const unique = [...new Set(themeIds)];
+      const [themes, assignments, branchAssignments] = await Promise.all([
+        tx.theme.findMany({ where: { id: { in: unique } }, select: { id: true, category: true, companyId: true } }),
+        tx.company.count({ where: { OR: [
+          { defaultVcardThemeId: { in: unique } }, { seasonalVcardThemeId: { in: unique } },
+        ] } }),
+        tx.branch.count({ where: { OR: [
+          { vcardThemeId: { in: unique } }, { seasonalVcardThemeId: { in: unique } },
+          { themeId: { in: unique } },
+        ] } }),
+      ]);
+      if (!isUnusedCompanyTheme(themes, unique, assignments, branchAssignments)) {
+        throw new Error('THEME_NOT_AVAILABLE');
+      }
+    }
     const defaultThemeId = await ensureCompanyDefaultTheme(tx, body);
     const created = await tx.company.create({
       data: {
@@ -130,6 +150,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ company }, { status: 201 });
   } catch (error) {
+    if (error instanceof Error && error.message === 'THEME_NOT_AVAILABLE') {
+      return NextResponse.json({ error: 'Un tema ya pertenece a otra compañía o está publicado. Cree un borrador/clon independiente.' }, { status: 422 });
+    }
     console.error('Error creating company:', error);
     return NextResponse.json({ error: 'No se pudo crear la empresa. Revise nombre, slug y sucursales duplicadas.' }, { status: 409 });
   }
