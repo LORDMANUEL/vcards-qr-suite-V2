@@ -1,5 +1,6 @@
 'use client';
 
+import { isVCardThemeInWindow } from '@/lib/vcard-theme-calendar';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Phone, Mail, MapPin, Globe, Download, Share2 } from 'lucide-react';
@@ -221,18 +222,10 @@ export default function ClientVCardPage({ initialData, vCardId, disableTracking 
     year: 'numeric',
   });
 
-  const isThemeInWindow = (theme: VCardTheme | null | undefined) => {
-    if (!theme) return false;
-    const now = Date.now();
-    const fromOk = !theme.validFrom || new Date(theme.validFrom).getTime() <= now;
-    const toOk = !theme.validTo || new Date(theme.validTo).getTime() >= now;
-    return fromOk && toOk;
-  };
-
-  const branchSeasonalTheme = vcard?.branch?.seasonalVcardTheme?.isActive && isThemeInWindow(vcard.branch.seasonalVcardTheme)
+  const branchSeasonalTheme = vcard?.branch?.seasonalVcardTheme?.isActive && isVCardThemeInWindow(vcard.branch.seasonalVcardTheme)
     ? vcard.branch.seasonalVcardTheme
     : null;
-  const companySeasonalTheme = vcard?.branch?.company?.seasonalVcardTheme?.isActive && isThemeInWindow(vcard.branch.company.seasonalVcardTheme)
+  const companySeasonalTheme = vcard?.branch?.company?.seasonalVcardTheme?.isActive && isVCardThemeInWindow(vcard.branch.company.seasonalVcardTheme)
     ? vcard.branch.company.seasonalVcardTheme
     : null;
 
