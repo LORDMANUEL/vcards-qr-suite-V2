@@ -4,7 +4,7 @@ import { themeRuntimeLayout, themeStudioDocument, persistVCardTheme } from '../l
 
 const legacy = [{ type: 'Header', id: 'header', props: { bgColor: '#003478' } }];
 const doc = {
-  name: 'Diseño original', canvas: { width: 375, height: 812, snap: true, showGrid: false },
+  name: 'Diseño original', canvas: { width: 375, height: 812, background: '#ffffff', gridSize: 12, snap: true, showGrid: false, showRulers: true },
   media: [], savedWidgets: [],
   elements: [{ id: 'header', kind: 'header', x: 12, y: 33, rotation: 0, locked: true }],
 };
