@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateVCardString } from '@/lib/qr-generator';
 import { securityCheck } from '@/lib/security';
+import { safeVcfFilename } from '@/lib/safe-vcf-filename';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,16 +30,6 @@ export async function GET(
       );
     }
 
-    // Increment download count
-    await prisma.vCard.update({
-      where: { id: vcard.id },
-      data: {
-        downloadCount: {
-          increment: 1,
-        },
-      },
-    });
-
     // Generate vCard string
     const vcardString = generateVCardString({
       name: vcard?.user?.name ?? '',
@@ -51,13 +42,24 @@ export async function GET(
       photoUrl: vcard?.user?.photoUrl ?? undefined,
     });
 
-    // Return as downloadable file
-    return new NextResponse(vcardString, {
+    const response = new NextResponse(vcardString, {
       headers: {
-        'Content-Type': 'text/vcard',
-        'Content-Disposition': `attachment; filename="${vcard?.user?.name?.replace(/\s+/g, '-')}.vcf"`,
+        'Content-Type': 'text/vcard; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${safeVcfFilename(vcard.user.name)}"`,
+        'Cache-Control': 'private, no-store',
+        'X-Content-Type-Options': 'nosniff',
       },
     });
+    // Do not count a failed VCF serialization as a successful download.
+    // Archived cards cannot receive a new download after the initial read.
+    const counted = await prisma.vCard.updateMany({
+      where: { id: vcard.id, isActive: true },
+      data: { downloadCount: { increment: 1 } },
+    });
+    if (counted.count === 0) {
+      return NextResponse.json({ error: 'vCard desactivada' }, { status: 404 });
+    }
+    return response;
   } catch (error) {
     console.error('Error downloading vCard:', error);
     return NextResponse.json(
