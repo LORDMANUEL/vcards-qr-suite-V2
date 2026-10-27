@@ -44,9 +44,10 @@ La implementación y disponibilidad de cada mejora depende de que el PR respecti
 
 ## Rama integrada para Codex
 
-Se ha preparado `integration/vcards-v2-codex-20261026` como **candidata de pruebas conjunta de los PR #2–#9**, no como publicación automática ni como reemplazo de sus revisiones individuales. Incluye el menú unificado de VCards Studio y Portal Manager.
+La rama histórica `integration/vcards-v2-codex-20261026` contiene #2–#9. **La candidata acumulativa actual para pruebas es `fix/user-delete-vcard-cascade-20261027` (PR #16)**, que añade #11–#16, no como publicación automática ni como reemplazo de sus revisiones individuales. Incluye el menú unificado de VCards Studio y Portal Manager.
 
 - [Manual de integración y validación para Codex](docs/v2/INTEGRATION_CODEX_READINESS_2026-10-26.md)
+- [Estado actualizado de preparación para Codex y QA de producción](docs/v2/CODEX_RELEASE_READINESS_2026-10-27.md)
 - [Preflight read-only del servidor](scripts/vcards-release-preflight.sh)
 - [CI GitHub Actions](https://github.com/LORDMANUEL/vcards-qr-suite-V2/actions)
 
@@ -83,6 +84,13 @@ Los cambios se revisan por fases y no deben desplegarse todos a la vez:
 | [#7](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/7) | Guardado reversible del Theme Builder, borradores y UX | #3 |
 | [#8](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/8) | Crear empresas sin sucursales automáticas; sedes explícitas | #2 |
 | [#9](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/9) | Temas públicos activos/fechas V1/V2 y protección contra borrado de temas utilizados | #7 |
+| [#10](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/10) | Integración conjunta de VCards, temas, tarjetas y Portal Manager | main (borrador) |
+| [#11](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/11) | Creación atómica User + VCard con protección de cuentas | #10 |
+| [#12](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/12) | URL pública confiable, firma QR y fallback aislado | #11 |
+| [#13](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/13) | Tests PostgreSQL CI reales en BD efímera | #12 |
+| [#14](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/14) | Archivado/restauración sin perder QR ni Scan | #13 |
+| [#15](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/15) | Verificación V1 SSR HMAC y exclusión de archivadas | #14 |
+| [#16](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/16) | Retención de usuarios y prevención de eliminaciones en cascada | #15 |
 
 **Criterio de aceptación:** CI del SHA final aprobado, revisión de código, QA integrada (empresa Ford/GAC/Quick Lane), URLs/QR históricos, privacidad, datos reales en staging, respaldo/restauración, plan operacional y aprobación explícita. CI verde no implica pruebas E2E ni autorización de despliegue.
 

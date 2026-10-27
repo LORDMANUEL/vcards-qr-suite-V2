@@ -3,7 +3,7 @@
 
 ## Resumen verificado
 - Repo: https://github.com/LORDMANUEL/vcards-qr-suite-V2
-- Rama candidata acumulativa MÁS RECIENTE: `fix/vcard-v1-public-access-20261027` (PR #15). Contiene los desarrollos de la rama de integración #10 junto con los PR apilados #11, #12, #13 y #14.
+- Rama candidata acumulativa MÁS RECIENTE: `fix/user-delete-vcard-cascade-20261027` (PR #16). Contiene la integración #10 y los PR apilados #11–#15, además de la protección de borrado/edición de usuarios del #16.
 - La rama `integration/vcards-v2-codex-20261026` (#10) es una **candidata histórica anterior**: no tiene las correcciones nuevas de cuentas, URLs firmadas, CI PostgreSQL, archivado y acceso V1 de #11–#15.
 - No se fusionó ningún PR en `main`, no se actualizó vCard en la IP, no se ejecutó código en el servidor real, no se migró ningún registro.
 - Los resultados de compilación solo valen para el SHA del run específico. Verificar el último run en https://github.com/LORDMANUEL/vcards-qr-suite-V2/actions.
@@ -23,12 +23,13 @@
 | Pruebas con PostgreSQL | #13 | CI-only (jamás usar db push con la BD real) |
 | Archivado reversible y analítica | #14 | QR histórico, Scan intactas, restauración de tarjeta |
 | Protección de V1 SSR | #15 | No divulgar tarjeta/usuario archivados, comprobar firma válida |
+| Retención de usuarios y seguridad PUT | #16 | Prohibir borrado CASCADE de tarjetas y reactivación por actualización parcial |
 
 ## Secuencia operativa para Codex (sin escrituras a producción)
 1. Traer código e identificar SHA exacto:
 ```bash
 git fetch --all --prune
-git checkout fix/vcard-v1-public-access-20261027
+git checkout fix/user-delete-vcard-cascade-20261027
 git rev-parse HEAD
 npm ci
 npx prisma validate
@@ -38,7 +39,7 @@ npm test
 npm run lint
 npm run build
 ```
-2. Revisar los documentos `docs/v2/PR01_INTEGRITY_FIX_2026-10-26.md`, `PR03A_THEME_SCOPES_2026-10-26.md`, `PR07_THEME_BUILDER_ROUNDTRIP_2026-10-26.md`, `PR09_RUNTIME_THEME_SAFETY_2026-10-26.md`, `PR11_VCARD_ACCOUNT_ATOMICITY_2026-10-26.md`, `PR12_PUBLIC_QR_SIGNATURE_2026-10-26.md`, `PR13_POSTGRES_CI_INTEGRATION_2026-10-26.md`, `PR14_VCARD_ARCHIVE_RETENTION_2026-10-27.md` y `PR15_V1_PUBLIC_ACCESS_2026-10-27.md`.
+2. Revisar los documentos `docs/v2/PR01_INTEGRITY_FIX_2026-10-26.md`, `PR03A_THEME_SCOPES_2026-10-26.md`, `PR07_THEME_BUILDER_ROUNDTRIP_2026-10-26.md`, `PR09_RUNTIME_THEME_SAFETY_2026-10-26.md`, `PR11_VCARD_ACCOUNT_ATOMICITY_2026-10-26.md`, `PR12_PUBLIC_QR_SIGNATURE_2026-10-26.md`, `PR13_POSTGRES_CI_INTEGRATION_2026-10-26.md`, `PR14_VCARD_ARCHIVE_RETENTION_2026-10-27.md` `PR15_V1_PUBLIC_ACCESS_2026-10-27.md` y `PR16_USER_RETENTION_2026-10-27.md`.
 3. Preparar copia aislada de PostgreSQL y datos sintéticos; no aplicar `prisma db push` sobre servidores de producción ni una BD compartida por 9301/9306.
 4. Con acceso autorizado al host Debian, ejecutar solo `bash scripts/vcards-release-preflight.sh` para identificar servicios, Node, puertos, red y endpoint HTTP. No imprimir `.env`, secretos ni tokens.
 5. Validar con Playwright/E2E (no implementado en estas ramas): acceso con roles autorizados, empresas/sucursales sin duplicar, Theme Builder round-trip, publicación Ford/GAC/Quick Lane independiente, calendario, PDF doble cara, Portal Manager, vCard V1/V2, QR firmado, dominio y métricas.
@@ -48,7 +49,7 @@ npm run build
 
 ## Riesgos abiertos que CI no resuelve
 - `VCard` no tiene restricción compuesta única `(userId,branchId)` en el esquema y concurrencia HTTP necesita pruebas completas. No agregar `@@unique` sin auditar registros anteriores.
-- `Scan` tiene `onDelete: Cascade` a VCard; PR #14 retira un DELETE físico de la API, pero otros endpoints de User/DB podrían seguir eliminando usuarios con cascada. Auditar políticas de retención antes de introducir purgas.
+- `Scan` tiene `onDelete: Cascade` a VCard. PR #14 reemplaza el DELETE físico de vCards; PR #16 protege el DELETE de User con bloqueo transaccional y 409 si hay tarjetas. Sigue pendiente revisar borrados administrativos alternativos y el resto de tablas.
 - `REQUIRE_VCARD_SIGNATURE=false` permite acceso sin firma a URLs legadas: debe definirse si se mantiene y auditar QR históricos antes de imponer `true`.
 - El mismo secreto NextAuth se usa actualmente para HMAC de QR. Una rotación puede invalidar QR antiguos; requiere una estrategia de clave de firma estable/versionada.
 - La API de listados conserva información de vCards archivadas para roles con `canViewVcards`; revisar RBAC y necesidad de auditoría adicional.

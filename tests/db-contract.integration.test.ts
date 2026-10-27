@@ -3,6 +3,7 @@ import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma';
 import { canDeleteTheme } from '../lib/vcard-theme-deletion';
+import { deleteUnlinkedUser } from '../lib/user-retention';
 
 /**
  * ONLY runs against a disposable PostgreSQL database created by CI.
@@ -55,6 +56,13 @@ test('PostgreSQL contract: multi-company branches, vCard transaction and theme F
       });
       assert.equal(await prisma.vCard.count({ where: { userId, branchId } }), 1);
       const scan = await prisma.scan.create({ data: { vcardId: card.id, scanMethod: 'QR' } });
+      // Parent deletion must be blocked for accounts owning any VCard,
+      // because VCard and Scan cascade on User hard-delete.
+      const blockedUserDelete = await deleteUnlinkedUser(prisma, userId!);
+      assert.deepEqual(blockedUserDelete, { status: 'has_vcards', vcards: 1 });
+      assert.ok(await prisma.user.findUnique({ where: { id: userId } }));
+      assert.equal(await prisma.scan.count({ where: { vcardId: card.id } }), 1);
+
       // Archived cards keep their original ID, signed QR lookup ID and full scan history.
       await prisma.vCard.updateMany({ where: { id: card.id, isActive: true }, data: { isActive: false } });
       const archived = await prisma.vCard.findUnique({ where: { id: card.id } });
