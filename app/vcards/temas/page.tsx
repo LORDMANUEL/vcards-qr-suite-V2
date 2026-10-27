@@ -39,6 +39,8 @@ function VCardTemasContent() {
     const [branches, setBranches] = useState<Branch[]>([]);
     const [companies, setCompanies] = useState<Company[]>([]);
     const [activationError, setActivationError] = useState('');
+    const [catalogError, setCatalogError] = useState('');
+    const [deletingThemeId, setDeletingThemeId] = useState<string | null>(null);
     const [publishing, setPublishing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [scheduleTheme, setScheduleTheme] = useState<Theme | null>(null);
@@ -68,9 +70,20 @@ function VCardTemasContent() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('¿Eliminar este tema?')) return;
-        await fetch(`/api/vcard-themes?id=${id}`, { method: 'DELETE' });
-        await fetchThemes();
+        if (deletingThemeId) return;
+        if (!confirm('¿Eliminar este tema? Solo se permiten borradores sin referencias en empresas, sucursales, puestos ni portales.')) return;
+        setCatalogError('');
+        setDeletingThemeId(id);
+        try {
+            const response = await fetch(`/api/vcard-themes?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.error || 'No se pudo eliminar el tema');
+            await fetchThemes();
+        } catch (error) {
+            setCatalogError(error instanceof Error ? error.message : 'No se pudo eliminar el tema');
+        } finally {
+            setDeletingThemeId(null);
+        }
     };
 
     const handleActivate = async () => {
@@ -229,6 +242,12 @@ function VCardTemasContent() {
                         </div>
                     </div>
 
+                    {catalogError && (
+                        <div role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                            <strong>El tema no se eliminó.</strong> {catalogError}
+                            <button type="button" onClick={() => setCatalogError('')} className="ml-3 underline">Cerrar</button>
+                        </div>
+                    )}
                     {loading ? (
                         <div className="flex justify-center py-20">
                             <div className="w-8 h-8 border-2 border-[#003478] border-t-transparent rounded-full animate-spin" />
