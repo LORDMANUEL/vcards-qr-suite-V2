@@ -636,9 +636,15 @@ function EditorContent() {
   };
 
   const exportDocx = async () => {
-    if (!canvasRef.current) return;
-    const canvas = await html2canvas(canvasRef.current, { backgroundColor: null, scale: 3, useCORS: true });
-    const image = canvas.toDataURL('image/png');
+    if (!validatePrintableQr()) return;
+    let image: string;
+    try {
+      image = await capturePrintableSide();
+    } catch (error) {
+      console.error('Error al exportar DOCX', error);
+      alert('No se pudo preparar el documento. Revise las imágenes de la tarjeta.');
+      return;
+    }
     const data = Uint8Array.from(atob(image.split(',')[1] || ''), (char) => char.charCodeAt(0));
 
     const docx = new Document({
