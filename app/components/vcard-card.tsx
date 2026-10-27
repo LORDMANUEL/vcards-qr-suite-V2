@@ -1,6 +1,6 @@
 'use client';
 
-import { Phone, Building2, MapPin, QrCode, Pencil, Trash2, Eye } from 'lucide-react';
+import { Phone, Building2, MapPin, QrCode, Pencil, Archive, RotateCcw, Eye } from 'lucide-react';
 import Link from 'next/link';
 
 interface VCardCardProps {
@@ -23,9 +23,11 @@ interface VCardCardProps {
   onViewQR: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onRestore: () => void;
+  busy?: boolean;
 }
 
-export function VCardCard({ vcard, onViewQR, onEdit, onDelete }: VCardCardProps) {
+export function VCardCard({ vcard, onViewQR, onEdit, onDelete, onRestore, busy = false }: VCardCardProps) {
   const initials = vcard?.user?.name
     ?.split(' ')
     ?.map((n) => n?.[0])
@@ -73,11 +75,9 @@ export function VCardCard({ vcard, onViewQR, onEdit, onDelete }: VCardCardProps)
       {/* Stats and Status */}
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm text-gray-600">{vcard?.downloadCount ?? 0} descargas</span>
-        {vcard?.isActive && (
-          <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
-            Activa
-          </span>
-        )}
+        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${vcard.isActive ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'}`}>
+          {vcard.isActive ? 'Activa' : 'Archivada'}
+        </span>
       </div>
 
       {/* Actions */}
@@ -91,25 +91,29 @@ export function VCardCard({ vcard, onViewQR, onEdit, onDelete }: VCardCardProps)
         </Link>
         <button
           onClick={onViewQR}
-          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-          title="Ver QR"
+          disabled={!vcard.isActive}
+          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-40"
+          title={vcard.isActive ? 'Ver QR' : 'Tarjeta archivada; restaure para usar el QR'}
         >
           <QrCode className="w-4 h-4" />
         </button>
         <button
           onClick={onEdit}
-          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-          title="Editar"
+          disabled={!vcard.isActive}
+          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-40"
+          title={vcard.isActive ? 'Editar' : 'Restaure antes de editar'}
         >
           <Pencil className="w-4 h-4" />
         </button>
-        <button
-          onClick={onDelete}
-          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-          title="Eliminar"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        {vcard.isActive ? (
+          <button onClick={onDelete} disabled={busy} className="p-2 text-amber-800 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-40" title="Archivar sin borrar historial" aria-label="Archivar vCard">
+            <Archive className="w-4 h-4" />
+          </button>
+        ) : (
+          <button onClick={onRestore} disabled={busy} className="p-2 text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-40" title="Restaurar vCard y su QR histórico" aria-label="Restaurar vCard">
+            <RotateCcw className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </div>
   );

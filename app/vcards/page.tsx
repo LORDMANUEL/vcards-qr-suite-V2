@@ -42,6 +42,8 @@ export default function VCardsPage() {
   const [vcards, setVcards] = useState<VCard[]>([]);
   const [filteredVcards, setFilteredVcards] = useState<VCard[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [visibility, setVisibility] = useState<'active' | 'archived'>('active');
+  const [cardOperationId, setCardOperationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -51,7 +53,7 @@ export default function VCardsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const groupedVcards = (filteredVcards || []).reduce((acc, vcard) => {
-    const key = vcard?.branch?.name || 'Sin sucursal';
+    const key = vcard?.branch?.id || 'no-branch'; // Names may repeat across companies
     if (!acc[key]) acc[key] = [];
     acc[key].push(vcard);
     return acc;
@@ -70,12 +72,14 @@ export default function VCardsPage() {
   useEffect(() => {
     const filtered = vcards?.filter(
       (vcard) =>
-        vcard?.user?.name?.toLowerCase()?.includes(searchQuery?.toLowerCase()) ||
-        vcard?.user?.email?.toLowerCase()?.includes(searchQuery?.toLowerCase()) ||
-        vcard?.user?.position?.toLowerCase()?.includes(searchQuery?.toLowerCase())
+        vcard.isActive === (visibility === 'active') && (
+          vcard?.user?.name?.toLowerCase()?.includes(searchQuery?.toLowerCase()) ||
+          vcard?.user?.email?.toLowerCase()?.includes(searchQuery?.toLowerCase()) ||
+          vcard?.user?.position?.toLowerCase()?.includes(searchQuery?.toLowerCase())
+        )
     );
     setFilteredVcards(filtered ?? []);
-  }, [searchQuery, vcards]);
+  }, [searchQuery, vcards, visibility]);
 
   const loadVCards = async () => {
     try {
@@ -92,40 +96,35 @@ export default function VCardsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar esta vCard?')) return;
-
+  const handleArchive = async (id: string) => {
+    if (cardOperationId) return;
+    if (!confirm('¿Archivar esta vCard? El QR dejará de funcionar mientras esté archivada, pero conservará sus escaneos y podrá restaurarse.')) return;
+    setCardOperationId(id);
     try {
-      const response = await fetch(`/api/vcards/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (response?.ok) {
-        loadVCards();
-        return;
-      }
-
-      const data = await response.json().catch(() => ({}));
-      if (response.status === 409) {
-        const scans = data?.scans || 0;
-        const force = confirm(`Esta vCard tiene ${scans} escaneos registrados.\n\nSi la eliminas, perderás historial de analítica.\n\n¿Deseas forzar eliminación?`);
-        if (!force) return;
-
-        const forcedResponse = await fetch(`/api/vcards/${id}?force=1`, { method: 'DELETE' });
-        if (forcedResponse.ok) {
-          loadVCards();
-          return;
-        }
-
-        const forcedData = await forcedResponse.json().catch(() => ({}));
-        alert(forcedData?.error || 'No se pudo eliminar la vCard en modo forzado.');
-        return;
-      }
-
-      alert(data?.error || 'No se pudo eliminar la vCard.');
+      const response = await fetch(`/api/vcards/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'No fue posible archivar la tarjeta');
+      await loadVCards();
     } catch (error) {
-      console.error('Error deleting vCard:', error);
-      alert('Error de red al intentar eliminar la vCard.');
+      alert(error instanceof Error ? error.message : 'Error al archivar la tarjeta');
+    } finally {
+      setCardOperationId(null);
+    }
+  };
+
+  const handleRestore = async (id: string) => {
+    if (cardOperationId) return;
+    if (!confirm('¿Restaurar esta vCard? Volverá a estar disponible mediante el mismo QR original.')) return;
+    setCardOperationId(id);
+    try {
+      const response = await fetch(`/api/vcards/${encodeURIComponent(id)}`, { method: 'PATCH' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'No fue posible restaurar la tarjeta');
+      await loadVCards();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Error al restaurar la tarjeta');
+    } finally {
+      setCardOperationId(null);
     }
   };
 
@@ -135,6 +134,7 @@ export default function VCardsPage() {
   };
 
   const handleEdit = (vcard: VCard) => {
+    if (!vcard.isActive) return;
     setSelectedVCard(vcard);
     setShowEditModal(true);
   };
@@ -176,7 +176,7 @@ export default function VCardsPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar
           title="Generador QR/vCards"
-          subtitle={`Bienvenido, ${session?.user?.name ?? 'Usuario'} - Ford Yude Canahuati`}
+          subtitle={`Bienvenido, ${session?.user?.name ?? 'Usuario'} · Empresas, sucursales y tarjetas digitales`}
         />
 
         <main className="flex-1 overflow-y-auto p-6">
@@ -190,7 +190,7 @@ export default function VCardsPage() {
               </div>
               <div className="flex-1">
                 <h2 className="text-xl font-bold text-gray-900">Generador QR/vCards</h2>
-                <p className="text-sm text-gray-600">Genera códigos QR y vCards para asesores de servicio</p>
+                <p className="text-sm text-gray-600">Administra las vCards por empresa y sucursal, sin perder QR ni historial.</p>
               </div>
             </div>
 
@@ -204,6 +204,10 @@ export default function VCardsPage() {
                   onChange={(e) => setSearchQuery(e?.target?.value ?? '')}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#003478] focus:border-transparent"
                 />
+              </div>
+              <div className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white p-1" aria-label="Filtrar por estado">
+                <button type="button" onClick={() => setVisibility('active')} aria-pressed={visibility === 'active'} className={`rounded-md px-3 py-2 text-sm font-bold ${visibility === 'active' ? 'bg-[#003478] text-white' : 'text-gray-700 hover:bg-gray-100'}`}>Activas ({vcards.filter(v => v.isActive).length})</button>
+                <button type="button" onClick={() => setVisibility('archived')} aria-pressed={visibility === 'archived'} className={`rounded-md px-3 py-2 text-sm font-bold ${visibility === 'archived' ? 'bg-[#003478] text-white' : 'text-gray-700 hover:bg-gray-100'}`}>Archivadas ({vcards.filter(v => !v.isActive).length})</button>
               </div>
               <button
                 onClick={() => setShowCreateModal(true)}
@@ -241,7 +245,7 @@ export default function VCardsPage() {
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {searchQuery ? 'No se encontraron vCards' : 'No hay vCards aún'}
+                {searchQuery ? 'No se encontraron vCards' : visibility === 'archived' ? 'No hay vCards archivadas' : 'No hay vCards activas'}
               </h3>
               <p className="text-gray-600 mb-6">
                 {searchQuery
@@ -263,7 +267,7 @@ export default function VCardsPage() {
               {Object.entries(groupedVcards).map(([branchName, branchVcards]) => (
                 <section key={branchName} className="rounded-xl border border-gray-200 bg-white p-4">
                   <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3">
-                    <h3 className="text-base font-extrabold text-[#003478]">{branchName}</h3>
+                    <h3 className="text-base font-extrabold text-[#003478]">{branchVcards[0]?.branch?.name || 'Sin sucursal'}</h3>
                     <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-[#003478]">{branchVcards.length} vCards</span>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -273,7 +277,9 @@ export default function VCardsPage() {
                         vcard={vcard}
                         onViewQR={() => handleViewQR(vcard)}
                         onEdit={() => handleEdit(vcard)}
-                        onDelete={() => handleDelete(vcard?.id)}
+                        onDelete={() => handleArchive(vcard.id)}
+                        onRestore={() => handleRestore(vcard.id)}
+                        busy={cardOperationId === vcard.id}
                       />
                     ))}
                   </div>

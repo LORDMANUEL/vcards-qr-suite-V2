@@ -49,10 +49,21 @@ test('PostgreSQL contract: multi-company branches, vCard transaction and theme F
         },
       });
       userId = user.id;
-      await prisma.vCard.create({
-        data: { userId, branchId, qrCodeData: randomUUID(), isActive: true },
+      const originalQr = randomUUID();
+      const card = await prisma.vCard.create({
+        data: { userId, branchId, qrCodeData: originalQr, isActive: true },
       });
       assert.equal(await prisma.vCard.count({ where: { userId, branchId } }), 1);
+      const scan = await prisma.scan.create({ data: { vcardId: card.id, scanMethod: 'QR' } });
+      // Archived cards keep their original ID, signed QR lookup ID and full scan history.
+      await prisma.vCard.updateMany({ where: { id: card.id, isActive: true }, data: { isActive: false } });
+      const archived = await prisma.vCard.findUnique({ where: { id: card.id } });
+      assert.equal(archived?.isActive, false);
+      assert.equal(archived?.qrCodeData, originalQr);
+      assert.equal(await prisma.scan.count({ where: { id: scan.id, vcardId: card.id } }), 1);
+      await prisma.vCard.updateMany({ where: { id: card.id, isActive: false }, data: { isActive: true } });
+      assert.equal((await prisma.vCard.findUnique({ where: { id: card.id } }))?.isActive, true);
+      assert.equal(await prisma.scan.count({ where: { vcardId: card.id } }), 1);
 
       // An intentional error inside a transaction must roll back changes to both
       // account and vCard. This simulates a failed second card creation.
