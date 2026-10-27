@@ -56,7 +56,7 @@ export async function POST(req: Request) {
       const crossCompany = {
         OR: [{ companyId: null }, { companyId: { not: companyId } }],
       };
-      const [foreignCompanies, foreignBranches] = await Promise.all([
+      const [foreignCompanies, foreignBranches, foreignRoleRules] = await Promise.all([
         tx.company.count({
           where: {
             id: { not: companyId },
@@ -67,12 +67,20 @@ export async function POST(req: Request) {
           where: {
             AND: [
               crossCompany,
-              { OR: [{ vcardThemeId: themeId }, { seasonalVcardThemeId: themeId }] },
+              { OR: [{ vcardThemeId: themeId }, { seasonalVcardThemeId: themeId }, { themeId }] },
             ],
           },
         }),
+        tx.vCardPositionThemeRule.count({
+          where: {
+            themeId,
+            branch: {
+              OR: [{ companyId: null }, { companyId: { not: companyId } }],
+            },
+          },
+        }),
       ]);
-      if (foreignCompanies || foreignBranches) {
+      if (foreignCompanies || foreignBranches || foreignRoleRules) {
         return { error: 'Este tema ya se usa fuera de la empresa elegida. Clone el tema antes de publicarlo.', status: 409 } as const;
       }
 
