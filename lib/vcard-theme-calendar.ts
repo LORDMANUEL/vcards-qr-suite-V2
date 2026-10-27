@@ -1,5 +1,6 @@
 const BUSINESS_TIME_ZONE = 'America/Tegucigalpa';
-export interface ThemeDates { validFrom?: string | null; validTo?: string | null }
+type ThemeDateValue = string | Date | null | undefined;
+export interface ThemeDates { validFrom?: ThemeDateValue; validTo?: ThemeDateValue }
 
 /** Legacy dates are calendar days entered in Honduras, not UTC instants. */
 export function hondurasDate(now: Date = new Date()): string {
@@ -9,12 +10,13 @@ export function hondurasDate(now: Date = new Date()): string {
   const get = (part: string) => parts.find((p) => p.type === part)?.value || '';
   return [get('year'), get('month'), get('day')].join('-');
 }
-function dateOnly(value: string | null | undefined): string | null {
+function dateOnly(value: ThemeDateValue): string | null {
   if (!value) return null;
+  if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.toISOString().slice(0, 10) : null;
   const result = String(value).slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(result) ? result : null;
 }
-export function isValidThemeDateRange(from?: string | null, to?: string | null): boolean {
+export function isValidThemeDateRange(from?: ThemeDateValue, to?: ThemeDateValue): boolean {
   if (from && !dateOnly(from)) return false;
   if (to && !dateOnly(to)) return false;
   const start = dateOnly(from), end = dateOnly(to);
