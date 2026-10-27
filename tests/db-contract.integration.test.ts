@@ -60,9 +60,17 @@ test('PostgreSQL contract: multi-company branches, vCard transaction and theme F
       const archived = await prisma.vCard.findUnique({ where: { id: card.id } });
       assert.equal(archived?.isActive, false);
       assert.equal(archived?.qrCodeData, originalQr);
+      // The same public server-side predicate is used by V1 and V2:
+      // no inactive VCard or inactive User should ever render.
+      assert.equal(await prisma.vCard.findFirst({
+        where: { qrCodeData: originalQr, isActive: true, user: { isActive: true } },
+      }), null);
       assert.equal(await prisma.scan.count({ where: { id: scan.id, vcardId: card.id } }), 1);
       await prisma.vCard.updateMany({ where: { id: card.id, isActive: false }, data: { isActive: true } });
       assert.equal((await prisma.vCard.findUnique({ where: { id: card.id } }))?.isActive, true);
+      assert.ok(await prisma.vCard.findFirst({
+        where: { qrCodeData: originalQr, isActive: true, user: { isActive: true } },
+      }));
       assert.equal(await prisma.scan.count({ where: { vcardId: card.id } }), 1);
 
       // An intentional error inside a transaction must roll back changes to both
