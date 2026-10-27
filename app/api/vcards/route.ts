@@ -10,6 +10,7 @@ import { canBulkImportVcards, canManageCompanies, canViewVcards } from '@/lib/pe
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { branchBelongsToCompany } from '@/lib/branch-integrity';
+import { validateAdvisorCardCreation, cardCreationError, type CreationConflict } from '@/lib/vcard-account-integrity';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,6 +89,13 @@ export async function GET() {
   }
 }
 
+class AdvisorCreationError extends Error {
+  constructor(public readonly conflict: CreationConflict) {
+    super(cardCreationError[conflict]);
+    this.name = 'AdvisorCreationError';
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -119,93 +127,78 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Empresa y sucursal no coinciden. Corrija su vinculación antes de crear la tarjeta.' }, { status: 422 });
     }
 
-    // 1. Find or Create the Advisor User
-    let user = await prisma.user.findUnique({
-      where: { email }
-    });
-
-    if (!user) {
-      const generatedPassword = randomBytes(24).toString('hex');
-      const hashedPassword = await bcrypt.hash(generatedPassword, 12);
-
-      // Create a default advisor user
-      user = await prisma.user.create({
-        data: {
-          email,
-          name,
-          password: hashedPassword,
-          role: 'ADVISOR',
-          isSystemUser: false,
-          position,
-          phone,
-          website,
-          photoUrl,
-          branchId,
-          isActive: true
-        }
-      });
-    } else {
-      // Update existing advisor info if needed
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          name,
-          position,
-          phone,
-          website,
-          photoUrl,
-          branchId
-        }
-      });
-    }
-
-    const userId = user.id;
-
-    // 2. Check for existing vCard
-    const existingVCard = await prisma.vCard.findFirst({
-      where: { userId, branchId }
-    });
-
-    if (existingVCard) {
-      return NextResponse.json({ error: 'El usuario ya tiene una vCard en esta sucursal' }, { status: 400 });
-    }
-
-    const qrCodeData = uuidv4();
-
-    // Security: Generate HMAC Signature for Anti-Cloning
+    // Generate the signed QR before opening a database transaction.
+    // Failure to render the image must not create an orphan User.
     const secret = process.env.NEXTAUTH_SECRET;
     if (!secret) {
       return NextResponse.json({ error: 'NEXTAUTH_SECRET no configurado' }, { status: 500 });
     }
+    const qrCodeData = uuidv4();
     const signature = CryptoJS.HmacSHA256(qrCodeData, secret).toString(CryptoJS.enc.Hex);
-
     const baseUrl = resolvePublicBaseUrl(request);
     const finalUrl = `${baseUrl}/vcard/${qrCodeData}?sig=${signature}`;
-
     const qrImageUrl = await QRCode.toDataURL(finalUrl, {
-      width: 400,
-      margin: 2,
-      color: {
-        dark: '#003478',
-        light: '#FFFFFF'
-      }
+      width: 400, margin: 2,
+      color: { dark: '#003478', light: '#FFFFFF' },
     });
 
-    const vcard = await prisma.vCard.create({
-      data: {
-        userId,
-        branchId,
-        qrCodeData,
-        qrImageUrl,
-        isActive: true
-      }
-    });
+    // User and VCard must be committed together; a duplicate cannot reassign
+    // an advisor already holding a card in another branch.
+    const vcard = await prisma.$transaction(async (tx) => {
+      const existingUser = await tx.user.findUnique({
+        where: { email },
+        include: { vcards: { select: { branchId: true } } },
+      });
 
-    // ISO 27001 Audit
-    await createAuditLog('CREATED', 'VCard', vcard.id, { qrId: qrCodeData, advisorEmail: email }, request);
+      const conflict = validateAdvisorCardCreation(existingUser, branchId);
+      if (conflict) throw new AdvisorCreationError(conflict);
+
+      let userId: string;
+      if (existingUser) {
+        const updated = await tx.user.update({
+          where: { id: existingUser.id },
+          data: { name, position, phone, website, photoUrl, branchId },
+        });
+        userId = updated.id;
+      } else {
+        const temporaryPassword = randomBytes(24).toString('hex');
+        const hashedPassword = await bcrypt.hash(temporaryPassword, 12);
+        const newAdvisor = await tx.user.create({
+          data: {
+            email, name, password: hashedPassword,
+            role: 'ADVISOR', isSystemUser: false,
+            position, phone, website, photoUrl,
+            branchId, isActive: true,
+          },
+        });
+        userId = newAdvisor.id;
+      }
+
+      return tx.vCard.create({
+        data: { userId, branchId, qrCodeData, qrImageUrl, isActive: true },
+      });
+    }, { isolationLevel: 'Serializable' });
+
+    // An audit transport failure must not turn an already committed creation
+    // into a false HTTP 500 that causes the user to retry and duplicate it.
+    try {
+      await createAuditLog('CREATED', 'VCard', vcard.id, { qrId: qrCodeData, advisorEmail: email }, request);
+    } catch (auditError) {
+      console.error('vCard creada, pero no se pudo registrar el evento de auditoría:', auditError);
+    }
 
     return NextResponse.json(vcard, { status: 201 });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof AdvisorCreationError) {
+      return NextResponse.json({ error: error.message, code: error.conflict }, { status: 409 });
+    }
+    if (typeof error === 'object' && error !== null && 'code' in error
+        && (error.code === 'P2002' || error.code === 'P2034')) {
+      return NextResponse.json({
+        error: 'La cuenta o tarjeta cambió mientras se guardaba. Recargue y verifique que no exista una vCard duplicada.',
+        code: 'CARD_WRITE_CONFLICT',
+      }, { status: 409 });
+    }
     console.error('Error creando vCard:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
