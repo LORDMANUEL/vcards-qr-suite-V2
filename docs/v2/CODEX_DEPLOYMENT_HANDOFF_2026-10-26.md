@@ -8,10 +8,11 @@
 - [#3 — Publicación de temas por empresa/sucursal](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/3): **apilado sobre #2**, rama `feat/vcard-themes-scoped-publishing-20261026`. Cuando #2 se fusione, rebasar #3 sobre main sin arrastrar commits duplicados.
 - [#4 — Estudio impresión CR80 y QR firmado](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/4): base main, independiente.
 - [#5 — Portal Manager y navegación separada](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/5): base main, independiente.
+- [#7 — Theme Builder sin pérdida de capas](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/7): **apilado sobre #3**, que depende de #2. Al rebasar, validar serialización `Theme.config.layout` en runtimes 9301/9306 y protección contra edición de temas publicados.
 - CI + instrucciones de despliegue en este PR de documentación.
 
 ## Estado real
-Los cambios existen como commits en ramas GitHub y borradores de PR. **No se han ejecutado pruebas en servidor, despliegues, alteraciones de PostgreSQL, actualizaciones de servicio ni merges**. No debe reportarse como implementado en producción hasta completar todas las verificaciones. Las pruebas unitarias propuestas son parciales; se necesitan integración/API, E2E, accesibilidad y pruebas reales de impresora y QR.
+Los cambios existen como commits en ramas GitHub y borradores de PR (incluido #7). **No se han ejecutado pruebas en servidor, despliegues, alteraciones de PostgreSQL, actualizaciones de servicio ni merges**. No debe reportarse como implementado en producción hasta completar todas las verificaciones. Las pruebas unitarias propuestas son parciales; se necesitan integración/API, E2E, accesibilidad y pruebas reales de impresora y QR.
 
 ## Comprobaciones obligatorias de Codex
 1. Inspeccionar diff, rama base, la documentación `docs/v2/`, errores conocidos y la versión real de `main`.
@@ -54,3 +55,11 @@ Nunca publicar la salida de variables de entorno, cadenas `DATABASE_URL`, `NEXTA
 `PR / SHA / diffs revisados / pruebas PASS-FAIL-SKIP con enlaces a logs / evidencia visual / problemas conocidos / decisiones / rollback / próximo PR`.
 
 No afirmar '100% funcional' ni desplegado si no se ha observado el sistema activo en el servidor.
+
+
+## Seguimiento de GitHub Actions y Theme Builder (#7)
+- Cada PR debe aprobar Prisma validate/generate, `typecheck`, `npm test`, `npm run lint` y `npm run build` sobre **su SHA final**, no el del PR de CI.
+- PR #7 introduce formato JSON reversible `{layout,studioDoc}`; antes de usarlo, comprobar compatibilidad del servicio 9301 si comparte DB con 9306. Si es incompatible, conservar temas en formato legacy hasta actualizar ambas rutas o aislar datos.
+- Las actualizaciones de un tema publicado devuelven 409; UI ofrece guardar borrador independiente para que el tema público anterior quede estable.
+- Secuencia obligatoria: #6 para CI y README, #2 integridad, #3 publicaciones, #7 editor reversible. #4 impresión y #5 portales pueden revisarse por separado, pero comprobar regresiones al integrarlos.
+- Deuda técnica pendiente: programación independiente por sucursal con ThemePublication/ThemeVersion, pruebas de navegador reales e impresión física. No afirmar esas funciones implementadas.
