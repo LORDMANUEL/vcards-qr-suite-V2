@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import { validBranchRegistration } from '../lib/branch-create-policy';
+test('company ID, name and city mandatory',()=>{for(const b of [{},{name:'SPS',city:'SPS'},{companyId:'x',city:'SPS'},{companyId:'x',name:'SPS'},{companyId:'x',name:'  ',city:'SPS'}])assert.equal(validBranchRegistration(b).ok,false);});
+test('trims and returns explicit IDs, not company labels',()=>assert.deepEqual(validBranchRegistration({companyId:' acme ',name:' SPS ',city:' San Pedro Sula ',companyName:'Fake'}),{ok:true,companyId:'acme',name:'SPS',city:'San Pedro Sula'}));
