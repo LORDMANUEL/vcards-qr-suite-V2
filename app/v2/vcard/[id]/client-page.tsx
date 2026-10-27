@@ -1,6 +1,7 @@
 'use client';
 
 import { resolveVCardTheme } from '@/lib/vcard-theme-resolver';
+import { publicVCardApiPath } from '@/lib/vcard-public-links';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Phone, Mail, MapPin, Globe, Download, Share2 } from 'lucide-react';
@@ -85,7 +86,7 @@ export default function ClientVCardPage({ initialData, vCardId, disableTracking 
     if (!initialData?.vcard && vCardId) {
       (async () => {
         try {
-          const response = await fetch(`/api/vcard/${vCardId}`, { cache: 'no-store' });
+          const response = await fetch(publicVCardApiPath(vCardId, 'profile', window.location.search), { cache: 'no-store' });
           if (!response.ok) {
             setLoadingData(false);
             return;
@@ -117,7 +118,7 @@ export default function ClientVCardPage({ initialData, vCardId, disableTracking 
 
   const handleDownloadVCard = async () => {
     try {
-      const response = await fetch(`/api/vcard/${vCardId}/download`);
+      const response = await fetch(publicVCardApiPath(vCardId, 'download', window.location.search));
       if (!response?.ok) throw new Error('Error al descargar');
 
       const blob = await response.blob();

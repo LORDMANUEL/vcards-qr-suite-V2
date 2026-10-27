@@ -11,20 +11,9 @@ import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { branchBelongsToCompany } from '@/lib/branch-integrity';
 import { validateAdvisorCardCreation, cardCreationError, type CreationConflict } from '@/lib/vcard-account-integrity';
+import { resolvePublicVCardBaseUrl } from '@/lib/vcard-public-links';
 
 export const dynamic = 'force-dynamic';
-
-function resolvePublicBaseUrl(request: Request) {
-  if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL;
-  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
-
-  const forwardedProto = request.headers.get('x-forwarded-proto');
-  const forwardedHost = request.headers.get('x-forwarded-host');
-  const host = forwardedHost || request.headers.get('host');
-  const proto = forwardedProto || 'https';
-
-  return host ? `${proto}://${host}` : 'http://127.0.0.1:3000';
-}
 
 export async function GET() {
   try {
@@ -135,7 +124,13 @@ export async function POST(request: Request) {
     }
     const qrCodeData = uuidv4();
     const signature = CryptoJS.HmacSHA256(qrCodeData, secret).toString(CryptoJS.enc.Hex);
-    const baseUrl = resolvePublicBaseUrl(request);
+    let baseUrl: string;
+    try {
+      baseUrl = resolvePublicVCardBaseUrl(process.env);
+    } catch (error) {
+      console.error('Configuración URL de vCard incompleta:', error);
+      return NextResponse.json({ error: 'Falta configurar el dominio público de las vCards. No se ha creado ningún usuario ni QR.' }, { status: 503 });
+    }
     const finalUrl = `${baseUrl}/vcard/${qrCodeData}?sig=${signature}`;
     const qrImageUrl = await QRCode.toDataURL(finalUrl, {
       width: 400, margin: 2,
