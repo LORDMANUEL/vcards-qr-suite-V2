@@ -53,6 +53,7 @@ export async function GET() {
       defaultVcardTheme: { select: { id: true, name: true } },
       seasonalVcardTheme: { select: { id: true, name: true } },
       branches: {
+        ...(branchId ? { where: { id: branchId } } : {}),
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
         select: {
           id: true,
@@ -67,7 +68,12 @@ export async function GET() {
     },
   });
 
-  return NextResponse.json({ companies });
+  // A matching company alone does not grant access to its other branches.
+  // Do not reveal total hidden branch counts in the response either.
+  const scopedCompanies = branchId
+    ? companies.map(company => ({ ...company, _count: { branches: company.branches.length } }))
+    : companies;
+  return NextResponse.json({ companies: scopedCompanies });
 }
 
 export async function POST(req: Request) {
