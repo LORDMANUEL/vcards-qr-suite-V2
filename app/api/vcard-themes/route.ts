@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { canManageThemes } from '@/lib/permissions';
 import { isValidThemeDateRange } from '@/lib/vcard-theme-calendar';
 import { persistVCardTheme } from '@/lib/vcard-theme-format';
+import { canDeleteTheme } from '@/lib/vcard-theme-deletion';
 
 /** Check every live theme pointer: isActive alone is not sufficient (legacy data).
  * Editing a published theme in place can alter public vCards without approval.
@@ -215,10 +216,39 @@ export async function DELETE(request: NextRequest) {
     }
 
     try {
-        await prisma.theme.delete({ where: { id } });
-        return NextResponse.json({ success: true });
-    } catch (error) {
+        const deleted = await prisma.$transaction(async (tx) => {
+            const theme = await tx.theme.findUnique({ where: { id }, select: { id: true, category: true } });
+            if (!theme || theme.category !== 'VCARD') return { status: 404, error: 'Tema vCard no encontrado' } as const;
+
+            const [companies, branches, positionRules, accessPoints] = await Promise.all([
+                tx.company.count({ where: { OR: [{ defaultVcardThemeId: id }, { seasonalVcardThemeId: id }] } }),
+                tx.branch.count({
+                    where: { OR: [{ vcardThemeId: id }, { seasonalVcardThemeId: id }, { themeId: id }, { portalThemeId: id }] },
+                }),
+                // Include disabled rules: they are stored references still protected by FK.
+                tx.vCardPositionThemeRule.count({ where: { themeId: id } }),
+                tx.accessPoint.count({ where: { themeId: id } }),
+            ]);
+            const references = { companies, branches, positionRules, accessPoints };
+            if (!canDeleteTheme(references)) {
+                return { status: 409, error: 'El tema todavía está asignado. Desvincúlelo de empresas, sucursales, puestos o nodos antes de eliminarlo.', references } as const;
+            }
+
+            await tx.theme.delete({ where: { id } });
+            return { success: true } as const;
+        }, { isolationLevel: 'Serializable' });
+
+        if ('error' in deleted) {
+            return NextResponse.json({ error: deleted.error, code: deleted.status === 409 ? 'THEME_IN_USE' : 'NOT_FOUND', ...('references' in deleted ? { references: deleted.references } : {}) }, { status: deleted.status });
+        }
+        return NextResponse.json(deleted);
+    } catch (error: any) {
+        // Concurrent assignment and FK constraints must not be reported as a
+        // successful delete (or trigger a cascade into published references).
+        if (error?.code === 'P2003' || error?.code === 'P2034') {
+            return NextResponse.json({ error: 'El tema tiene referencias o cambió durante la eliminación. Actualice el catálogo e inténtelo de nuevo.', code: 'THEME_IN_USE' }, { status: 409 });
+        }
         console.error('Error deleting theme:', error);
-        return NextResponse.json({ error: 'Error deleting theme' }, { status: 500 });
+        return NextResponse.json({ error: 'No se pudo eliminar el tema' }, { status: 500 });
     }
 }
