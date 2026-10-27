@@ -71,6 +71,7 @@ Los cambios se revisan por fases y no deben desplegarse todos a la vez:
 | [#5](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/5) | Espacio Portal Manager | main |
 | [#6](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/6) | CI, SQL read-only, manual Codex y documentación | main |
 | [#7](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/7) | Guardado reversible del Theme Builder, borradores y UX | #3 |
+| [#8](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/8) | Crear empresas sin sucursales automáticas; sedes explícitas | #2 |
 
 **Criterio de aceptación:** CI del SHA final aprobado, revisión de código, QA integrada (empresa Ford/GAC/Quick Lane), URLs/QR históricos, privacidad, datos reales en staging, respaldo/restauración, plan operacional y aprobación explícita. CI verde no implica pruebas E2E ni autorización de despliegue.
 
@@ -82,7 +83,7 @@ Los cambios se revisan por fases y no deben desplegarse todos a la vez:
 - [Cambios V2](docs/v2/CHANGELOG_V2.md), [origen del snapshot](docs/v2/SOURCE_SNAPSHOT.md) y [Rollback](docs/v2/ROLLBACK.md)
 - [Instrucciones de Codex / despliegue seguro](docs/v2/CODEX_DEPLOYMENT_HANDOFF_2026-10-26.md)
 - [Diagnóstico SQL solo lectura](docs/v2/RECONCILIATION_READONLY_2026-10-26.sql)
-- [PR 2 integridad](docs/v2/PR01_INTEGRITY_FIX_2026-10-26.md), [PR 3 temas](docs/v2/PR03A_THEME_SCOPES_2026-10-26.md), [PR 4 impresión](docs/v2/PR06_PRINT_STUDIO_2026-10-26.md), [PR 5 portal](docs/v2/PR07A_PORTAL_WORKSPACE_2026-10-26.md), [PR 7 Theme Builder](docs/v2/PR07_THEME_BUILDER_ROUNDTRIP_2026-10-26.md)
+- [PR 2 integridad](docs/v2/PR01_INTEGRITY_FIX_2026-10-26.md), [PR 3 temas](docs/v2/PR03A_THEME_SCOPES_2026-10-26.md), [PR 4 impresión](docs/v2/PR06_PRINT_STUDIO_2026-10-26.md), [PR 5 portal](docs/v2/PR07A_PORTAL_WORKSPACE_2026-10-26.md), [PR 7 Theme Builder](docs/v2/PR07_THEME_BUILDER_ROUNDTRIP_2026-10-26.md), [PR 8 alta explícita de sedes](docs/v2/PR08_EXPLICIT_COMPANY_BRANCHES_2026-10-26.md)
 
 Algunos documentos se incorporan mediante PRs independientes: sus enlaces funcionarán en `main` una vez integrados.
 
