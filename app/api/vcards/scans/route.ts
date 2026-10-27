@@ -5,10 +5,11 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { canViewVcards } from '@/lib/permissions';
 import { parseScanReportQuery } from '@/lib/scan-query';
+import { validateScanEvent } from '@/lib/scan-event';
 
 const RATE_LIMIT_MS = 60000;
-const MAX_SCANS_PER_MINUTE = Number(process.env.VCARD_MAX_SCANS_PER_MINUTE || 15);
-const ALLOWED_SCAN_METHODS = new Set(['QR', 'MANUAL', 'DIRECT']);
+const configuredLimit = Number(process.env.VCARD_MAX_SCANS_PER_MINUTE || 15);
+const MAX_SCANS_PER_MINUTE = Number.isInteger(configuredLimit) && configuredLimit > 0 && configuredLimit <= 1000 ? configuredLimit : 15;
 
 async function isRateLimited(ip: string, vcardId: string, scanMethod: string) {
   const cutoff = new Date(Date.now() - RATE_LIMIT_MS);
@@ -37,15 +38,13 @@ async function isRateLimited(ip: string, vcardId: string, scanMethod: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { vcardId, scanMethod = 'QR' } = body;
-
-    if (!vcardId) {
-      return NextResponse.json({ error: 'vcardId is required' }, { status: 400 });
-    }
+    const body = await request.json().catch(() => null);
+    const validated = validateScanEvent(body);
+    if (!validated.ok) return NextResponse.json({ error: validated.error }, { status: 400 });
+    const { vcardId, scanMethod } = validated;
 
     const vcard = await prisma.vCard.findUnique({
-      where: { id: String(vcardId) },
+      where: { id: vcardId },
       select: { id: true, isActive: true, user: { select: { isActive: true } } },
     });
 
@@ -57,9 +56,7 @@ export async function POST(request: NextRequest) {
     const forwarded = request.headers.get('x-forwarded-for');
     const ip = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown';
 
-    const safeScanMethod = ALLOWED_SCAN_METHODS.has(String(scanMethod).toUpperCase())
-      ? String(scanMethod).toUpperCase()
-      : 'QR';
+    const safeScanMethod = scanMethod;
 
     if (await isRateLimited(ip, vcard.id, safeScanMethod)) {
       return NextResponse.json({ 
