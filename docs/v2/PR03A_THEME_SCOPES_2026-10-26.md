@@ -35,3 +35,13 @@ Revertir el PR vía commit. Si ya hubo publicaciones realizadas en un entorno co
 
 ## Estado
 Cambios de código y unit tests propuestos y subidos; no se ha ejecutado compilación, QA con BD real, migración ni despliegue desde esta conversación.
+
+## Calendario y compatibilidad (extensión posterior)
+
+- V1 y V2 ahora evalúan `validFrom`/`validTo` por día calendario de `America/Tegucigalpa`, inclusivo. Se agregaron `lib/vcard-theme-calendar.ts` y pruebas para el cambio de día a las 06:00 UTC.
+- La API de temas rechaza rangos invertidos con 422; el catálogo valida y muestra el error. Los `DateTime` Prisma se aceptan como `Date` además de su representación JSON como texto.
+- La publicación no permite reutilizar temas ya asociados a una compañía diferente, incluyendo referencias legadas `Branch.themeId` y reglas por puesto `VCardPositionThemeRule` de otra empresa.
+- Sigue faltando un modelo de publicaciones programadas distinto por sucursal. Los campos del tema son compartidos y **no** equivalen a una agenda independiente para cada destino.
+
+## Estado de pruebas
+Las ramas tienen workflow CI propuesto y pruebas unitarias; comprobar en GitHub Actions el último SHA antes del merge. No afirmar validación aprobada por resultados de un commit anterior. Compilación, integración BD y regresión real siguen condicionadas al job correspondiente.
