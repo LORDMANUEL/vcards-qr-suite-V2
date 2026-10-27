@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
+import { isValidThemeDateRange } from '@/lib/vcard-theme-calendar';
 import { Sidebar } from '../../components/sidebar';
 import { Topbar } from '../../components/topbar';
 import { VCardsGuidedTour } from '../../components/vcards-guided-tour';
@@ -115,7 +116,7 @@ function VCardTemasContent() {
 
     const openSchedule = (theme: Theme) => {
         setScheduleTheme(theme);
-        const anchorDate = theme.validFrom ? new Date(theme.validFrom) : new Date();
+        const anchorDate = theme.validFrom ? new Date(`${String(theme.validFrom).slice(0, 10)}T12:00:00`) : new Date();
         setCalendarMonth(new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1));
         setScheduleForm({
             validFrom: theme.validFrom ? String(theme.validFrom).slice(0, 10) : '',
@@ -126,13 +127,23 @@ function VCardTemasContent() {
 
     const saveSchedule = async () => {
         if (!scheduleTheme) return;
-        await fetch('/api/vcard-themes', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: scheduleTheme.id, type: scheduleForm.type, validFrom: scheduleForm.validFrom || null, validTo: scheduleForm.validTo || null }),
-        });
-        setScheduleTheme(null);
-        await fetchThemes();
+        if (!isValidThemeDateRange(scheduleForm.validFrom, scheduleForm.validTo)) {
+            alert('La fecha final no puede ser anterior a la inicial.');
+            return;
+        }
+        try {
+            const response = await fetch('/api/vcard-themes', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: scheduleTheme.id, type: scheduleForm.type, validFrom: scheduleForm.validFrom || null, validTo: scheduleForm.validTo || null }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data?.error || 'No se pudo programar el tema');
+            setScheduleTheme(null);
+            await fetchThemes();
+        } catch (error) {
+            alert(error instanceof Error ? error.message : 'Error al programar');
+        }
     };
 
     const applyPreset = (preset: 'today' | 'weekend' | 'month') => {
