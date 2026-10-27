@@ -31,7 +31,13 @@ export function themeStudioDocument(config: unknown): VCardThemeStudioDocument |
       || !Array.isArray(candidate.savedWidgets)
       || typeof candidate.name !== 'string'
       || typeof candidate.canvas.width !== 'number'
-      || typeof candidate.canvas.height !== 'number') return null;
+      || typeof candidate.canvas.height !== 'number'
+      || typeof candidate.canvas.background !== 'string'
+      || typeof candidate.canvas.gridSize !== 'number'
+      || typeof candidate.canvas.snap !== 'boolean'
+      || typeof candidate.canvas.showGrid !== 'boolean'
+      || typeof candidate.canvas.showRulers !== 'boolean'
+      || candidate.elements.some((el) => !el || typeof el.id !== 'string' || typeof el.kind !== 'string')) return null;
   return candidate as VCardThemeStudioDocument;
 }
 export function persistVCardTheme(layout: unknown, studioDoc?: unknown): RuntimeBlock[] | { layout: RuntimeBlock[]; studioDoc: VCardThemeStudioDocument } {
