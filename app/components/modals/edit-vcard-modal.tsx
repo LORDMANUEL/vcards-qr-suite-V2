@@ -76,8 +76,8 @@ export function EditVCardModal({ isOpen, onClose, onSuccess, vcard }: EditVCardM
 
   useEffect(() => {
     if (vcard) {
-      const currentBranch = branches.find((branch) => branch.id === vcard?.branch?.id)
-        || branches.find((branch) => branch.name === vcard?.branch?.name);
+      // Never match by branch name; duplicates exist across companies.
+      const currentBranch = branches.find((branch) => branch.id === vcard?.branch?.id);
       setFormData({
         name: vcard?.user?.name ?? '',
         position: vcard?.user?.position ?? '',
@@ -96,8 +96,7 @@ export function EditVCardModal({ isOpen, onClose, onSuccess, vcard }: EditVCardM
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === 'companyId') {
-      const firstBranch = branches.find((branch) => branch.companyId === value);
-      setFormData((prev) => ({ ...prev, companyId: value, branchId: firstBranch?.id || '' }));
+      setFormData((prev) => ({ ...prev, companyId: value, branchId: '' }));
       return;
     }
     if (name === 'branchId') {
@@ -112,12 +111,17 @@ export function EditVCardModal({ isOpen, onClose, onSuccess, vcard }: EditVCardM
     }));
   };
 
-  const filteredBranches = branches.filter((branch) => !formData.companyId || branch.companyId === formData.companyId);
+  const filteredBranches = branches.filter((branch) => Boolean(formData.companyId) && branch.companyId === formData.companyId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    if (!formData.companyId || !filteredBranches.some((branch) => branch.id === formData.branchId)) {
+      setError('La sucursal no está vinculada a esta empresa. Primero revise las asociaciones de datos.');
+      setLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch(`/api/vcards/${vcard?.id}`, {
@@ -229,10 +233,11 @@ export function EditVCardModal({ isOpen, onClose, onSuccess, vcard }: EditVCardM
                 name="branchId"
                 value={formData?.branchId ?? ''}
                 onChange={handleChange}
+                disabled={!formData.companyId || filteredBranches.length === 0}
                 required
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#003478] focus:border-transparent"
               >
-                <option value="">Seleccione una sucursal</option>
+                <option value="">{!formData.companyId ? 'Primero seleccione una empresa' : filteredBranches.length ? 'Seleccione una sucursal' : 'Esta empresa no tiene sucursales vinculadas'}</option>
                 {filteredBranches.map((branch) => (
                   <option key={branch.id} value={branch.id}>{branch.name}{branch.city ? ` (${branch.city})` : ''}</option>
                 ))}

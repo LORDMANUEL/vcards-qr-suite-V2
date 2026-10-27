@@ -4,6 +4,21 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { canManageThemes } from '@/lib/permissions';
+import { isValidThemeDateRange } from '@/lib/vcard-theme-calendar';
+import { persistVCardTheme } from '@/lib/vcard-theme-format';
+import { canDeleteTheme } from '@/lib/vcard-theme-deletion';
+
+/** Check every live theme pointer: isActive alone is not sufficient (legacy data).
+ * Editing a published theme in place can alter public vCards without approval.
+ */
+async function isPublishedTheme(id: string): Promise<boolean> {
+    const [companies, branches, positions] = await Promise.all([
+        prisma.company.count({ where: { OR: [{ defaultVcardThemeId: id }, { seasonalVcardThemeId: id }] } }),
+        prisma.branch.count({ where: { OR: [{ vcardThemeId: id }, { seasonalVcardThemeId: id }, { themeId: id }] } }),
+        prisma.vCardPositionThemeRule.count({ where: { themeId: id, isEnabled: true } }),
+    ]);
+    return companies + branches + positions > 0;
+}
 
 // GET - Lista todos los temas vCard o uno específico por ID
 export async function GET(request: NextRequest) {
@@ -21,7 +36,7 @@ export async function GET(request: NextRequest) {
     try {
         if (id) {
             const theme = await prisma.theme.findUnique({ where: { id } });
-            return NextResponse.json({ theme });
+            return NextResponse.json({ theme, published: theme ? await isPublishedTheme(id) : false });
         }
 
         const themes = await prisma.theme.findMany({
@@ -47,7 +62,8 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = await request.json();
-        const { name, layoutJson, configJson, type, validFrom, validTo, cloneThemeId } = body;
+        const { name, layoutJson, studioDoc, type, validFrom, validTo, cloneThemeId } = body;
+        if (!isValidThemeDateRange(validFrom, validTo)) return NextResponse.json({ error: 'Rango de fechas inválido' }, { status: 422 });
 
         if (cloneThemeId) {
             const sourceTheme = await prisma.theme.findUnique({ where: { id: cloneThemeId } });
@@ -75,8 +91,17 @@ export async function POST(request: NextRequest) {
 
         const normalizedName = String(name || '').trim();
 
-        if (!normalizedName || !layoutJson) {
-            return NextResponse.json({ error: 'Name and layoutJson are required' }, { status: 400 });
+        if (!normalizedName || !Array.isArray(layoutJson)) {
+            return NextResponse.json({ error: 'Nombre y bloques de diseño requeridos' }, { status: 400 });
+        }
+        if (studioDoc !== undefined && JSON.stringify(studioDoc).length > 2000000) {
+            return NextResponse.json({ error: 'El diseño excede 2 MB. Use URLs de imágenes optimizadas.' }, { status: 413 });
+        }
+        let themeConfig: ReturnType<typeof persistVCardTheme>;
+        try {
+            themeConfig = persistVCardTheme(layoutJson, studioDoc);
+        } catch {
+            return NextResponse.json({ error: 'Estructura del diseño inválida' }, { status: 422 });
         }
 
         // Extraer "primary color" del primer bloque Header
@@ -90,7 +115,7 @@ export async function POST(request: NextRequest) {
                 category: 'VCARD',
                 type: type || 'CORPORATE',
                 colors: colorsJson,
-                config: layoutJson,
+                config: themeConfig as any,
                 isActive: false,
                 validFrom: validFrom ? new Date(validFrom) : null,
                 validTo: validTo ? new Date(validTo) : null,
@@ -116,10 +141,33 @@ export async function PUT(request: NextRequest) {
 
     try {
         const body = await request.json();
-        const { id, name, layoutJson, isActive, type, validFrom, validTo } = body;
+        const { id, name, layoutJson, studioDoc, isActive, type, validFrom, validTo } = body;
+        if (!isValidThemeDateRange(validFrom, validTo)) return NextResponse.json({ error: 'Rango de fechas inválido' }, { status: 422 });
 
         if (!id) {
             return NextResponse.json({ error: 'ID is required' }, { status: 400 });
+        }
+        if (layoutJson !== undefined && !Array.isArray(layoutJson)) {
+            return NextResponse.json({ error: 'Los bloques deben ser una lista' }, { status: 422 });
+        }
+        if (studioDoc !== undefined && JSON.stringify(studioDoc).length > 2000000) {
+            return NextResponse.json({ error: 'El diseño excede 2 MB. Use imágenes por URL.' }, { status: 413 });
+        }
+        let themeConfig: ReturnType<typeof persistVCardTheme> | undefined;
+        if (layoutJson !== undefined) {
+            try {
+                themeConfig = persistVCardTheme(layoutJson, studioDoc);
+            } catch {
+                return NextResponse.json({ error: 'Estructura del diseño inválida' }, { status: 422 });
+            }
+            const current = await prisma.theme.findUnique({ where: { id }, select: { id: true, category: true, isActive: true } });
+            if (!current || current.category !== 'VCARD') return NextResponse.json({ error: 'Tema no encontrado' }, { status: 404 });
+            if (current.isActive || await isPublishedTheme(id)) {
+                return NextResponse.json({
+                    code: 'THEME_PUBLISHED',
+                    error: 'El tema está publicado. Guarde los cambios como nuevo borrador para no modificar las tarjetas activas.',
+                }, { status: 409 });
+            }
         }
 
         const headerBlock = layoutJson?.find((b: any) => b.type === 'Header');
@@ -129,18 +177,13 @@ export async function PUT(request: NextRequest) {
         const normalizedName = typeof name === 'string' ? name.trim() : undefined;
 
         const theme = await prisma.$transaction(async (tx) => {
-            if (isActive === true) {
-                await tx.theme.updateMany({
-                    where: { category: 'VCARD', NOT: { id } },
-                    data: { isActive: false },
-                });
-            }
-
+            // isActive is a theme availability flag, not a unique global publication.
+            // Never deactivate themes of unrelated companies here.
             return tx.theme.update({
                 where: { id },
                 data: {
                     ...(normalizedName ? { name: normalizedName } : {}),
-                    ...(layoutJson ? { config: layoutJson, colors: colorsJson } : {}),
+                    ...(themeConfig !== undefined ? { config: themeConfig as any, colors: colorsJson } : {}),
                     ...(isActive !== undefined ? { isActive } : {}),
                     ...(type ? { type } : {}),
                     ...(validFrom !== undefined ? { validFrom: validFrom ? new Date(validFrom) : null } : {}),
@@ -173,10 +216,39 @@ export async function DELETE(request: NextRequest) {
     }
 
     try {
-        await prisma.theme.delete({ where: { id } });
-        return NextResponse.json({ success: true });
-    } catch (error) {
+        const deleted = await prisma.$transaction(async (tx) => {
+            const theme = await tx.theme.findUnique({ where: { id }, select: { id: true, category: true } });
+            if (!theme || theme.category !== 'VCARD') return { status: 404, error: 'Tema vCard no encontrado' } as const;
+
+            const [companies, branches, positionRules, accessPoints] = await Promise.all([
+                tx.company.count({ where: { OR: [{ defaultVcardThemeId: id }, { seasonalVcardThemeId: id }] } }),
+                tx.branch.count({
+                    where: { OR: [{ vcardThemeId: id }, { seasonalVcardThemeId: id }, { themeId: id }, { portalThemeId: id }] },
+                }),
+                // Include disabled rules: they are stored references still protected by FK.
+                tx.vCardPositionThemeRule.count({ where: { themeId: id } }),
+                tx.accessPoint.count({ where: { themeId: id } }),
+            ]);
+            const references = { companies, branches, positionRules, accessPoints };
+            if (!canDeleteTheme(references)) {
+                return { status: 409, error: 'El tema todavía está asignado. Desvincúlelo de empresas, sucursales, puestos o nodos antes de eliminarlo.', references } as const;
+            }
+
+            await tx.theme.delete({ where: { id } });
+            return { success: true } as const;
+        }, { isolationLevel: 'Serializable' });
+
+        if ('error' in deleted) {
+            return NextResponse.json({ error: deleted.error, code: deleted.status === 409 ? 'THEME_IN_USE' : 'NOT_FOUND', ...('references' in deleted ? { references: deleted.references } : {}) }, { status: deleted.status });
+        }
+        return NextResponse.json(deleted);
+    } catch (error: any) {
+        // Concurrent assignment and FK constraints must not be reported as a
+        // successful delete (or trigger a cascade into published references).
+        if (error?.code === 'P2003' || error?.code === 'P2034') {
+            return NextResponse.json({ error: 'El tema tiene referencias o cambió durante la eliminación. Actualice el catálogo e inténtelo de nuevo.', code: 'THEME_IN_USE' }, { status: 409 });
+        }
         console.error('Error deleting theme:', error);
-        return NextResponse.json({ error: 'Error deleting theme' }, { status: 500 });
+        return NextResponse.json({ error: 'No se pudo eliminar el tema' }, { status: 500 });
     }
 }

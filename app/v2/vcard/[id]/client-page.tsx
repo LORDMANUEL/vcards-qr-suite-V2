@@ -1,5 +1,6 @@
 'use client';
 
+import { resolveVCardTheme } from '@/lib/vcard-theme-resolver';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Phone, Mail, MapPin, Globe, Download, Share2 } from 'lucide-react';
@@ -221,26 +222,21 @@ export default function ClientVCardPage({ initialData, vCardId, disableTracking 
     year: 'numeric',
   });
 
-  const isThemeInWindow = (theme: VCardTheme | null | undefined) => {
-    if (!theme) return false;
-    const now = Date.now();
-    const fromOk = !theme.validFrom || new Date(theme.validFrom).getTime() <= now;
-    const toOk = !theme.validTo || new Date(theme.validTo).getTime() >= now;
-    return fromOk && toOk;
-  };
-
-  const branchSeasonalTheme = vcard?.branch?.seasonalVcardTheme?.isActive && isThemeInWindow(vcard.branch.seasonalVcardTheme)
-    ? vcard.branch.seasonalVcardTheme
-    : null;
-  const companySeasonalTheme = vcard?.branch?.company?.seasonalVcardTheme?.isActive && isThemeInWindow(vcard.branch.company.seasonalVcardTheme)
-    ? vcard.branch.company.seasonalVcardTheme
-    : null;
-
   const userPositionGroup = getPositionGroup(vcard?.user?.position);
-  const roleRule = (vcard?.branch?.vcardPositionThemeRules || []).find((rule) => rule.positionGroup === userPositionGroup);
-  const roleTheme = roleRule?.isEnabled && roleRule?.theme?.isActive ? roleRule.theme : null;
+  const roleRule = (vcard?.branch?.vcardPositionThemeRules || [])
+    .find((rule) => rule.positionGroup === userPositionGroup);
 
-  const activeVCardTheme = roleTheme || branchSeasonalTheme || vcard?.branch?.vcardTheme || companySeasonalTheme || vcard?.branch?.company?.defaultVcardTheme || activeGlobalTheme || vcard?.branch?.theme;
+  // Only published, date-eligible themes can override lower-priority defaults.
+  // V1 and V2 deliberately share the exact same precedence and Honduras calendar.
+  const activeVCardTheme = resolveVCardTheme({
+    role: roleRule?.isEnabled ? roleRule.theme : null,
+    branchSeasonal: vcard?.branch?.seasonalVcardTheme,
+    branchCorporate: vcard?.branch?.vcardTheme,
+    companySeasonal: vcard?.branch?.company?.seasonalVcardTheme,
+    companyCorporate: vcard?.branch?.company?.defaultVcardTheme,
+    global: activeGlobalTheme,
+    legacy: vcard?.branch?.theme,
+  });
 
   let themeColors: { primary?: string; secondary?: string; accent?: string } | null = null;
   if (activeVCardTheme?.isActive && activeVCardTheme?.colors) {

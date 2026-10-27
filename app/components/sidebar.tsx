@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
+import { isPortalWorkspacePath } from '@/lib/portal-workspace';
 import {
   LayoutDashboard,
   Users,
@@ -43,8 +44,8 @@ const menuGroups = [
     items: [
       { name: 'Generador QR/vCards', icon: QrCode, href: '/vcards' },
       { name: 'Empresas vCard', icon: Building2, href: '/vcards/companias' },
-      { name: 'Theme Builder', icon: Edit, href: '/vcards/theme-builder' },
-      { name: 'Editor Temas vCard', icon: Palette, href: '/vcards/temas' },
+      { name: 'Diseñar temas vCard', icon: Edit, href: '/vcards/theme-builder' },
+      { name: 'Publicar temas vCard', icon: Palette, href: '/vcards/temas' },
       { name: 'Editor de Tarjetas', icon: Printer, href: '/vcards/editor' },
       { name: 'Reportes de Escaneo', icon: BarChart3, href: '/reportes?tab=vcards' },
     ]
@@ -52,7 +53,9 @@ const menuGroups = [
   {
     name: 'Portales Cautivos',
       items: [
-        { name: 'Usuarios Conectados', icon: Wifi, href: '/usuarios' },
+        { name: 'Inicio Portales', icon: Globe, href: '/portal-admin' },
+        { name: 'Nodos / Access Points', icon: Wifi, href: '/ubicaciones' },
+        { name: 'Usuarios Conectados', icon: Users, href: '/usuarios' },
         { name: 'Temas Portales', icon: Palette, href: '/temas-portal' },
         { name: 'Sucursales Portal', icon: MapPin, href: '/portales/sucursales' },
         { name: 'Links Portales', icon: LinkIcon, href: '/links' },
@@ -73,6 +76,10 @@ const menuGroups = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const portalWorkspace = isPortalWorkspacePath(pathname);
+  const visibleGroups = menuGroups.filter((group) =>
+    group.name !== (portalWorkspace ? 'vCards' : 'Portales Cautivos')
+  );
   const { data: session } = useSession() || {};
 
   const user = session?.user;
@@ -90,14 +97,18 @@ export function Sidebar() {
     <div className="h-screen w-64 bg-white border-r border-gray-200 flex flex-col">
       {/* Header */}
       <div className="p-6 border-b border-gray-200">
-        <h1 className="text-xl font-bold text-[#003478]">Ford Admin</h1>
-        <p className="text-sm text-gray-600 mt-1">Portal Cautivo</p>
+        <h1 className="text-xl font-bold text-[#003478]">{portalWorkspace ? 'Portal Manager' : 'VCards Studio'}</h1>
+        <p className="text-sm text-gray-600 mt-1">{portalWorkspace ? 'Administración de portales y nodos' : 'Tarjetas digitales y QR'}</p>
+        <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-semibold">
+          <Link href="/vcards" className={`rounded-lg px-2 py-2 text-center ${!portalWorkspace ? 'bg-[#003478] text-white' : 'bg-gray-100 text-gray-600'}`}>vCards</Link>
+          <Link href="/portal-admin" className={`rounded-lg px-2 py-2 text-center ${portalWorkspace ? 'bg-[#003478] text-white' : 'bg-gray-100 text-gray-600'}`}>Portales</Link>
+        </div>
       </div>
 
       {/* Menu Items */}
       <nav className="flex-1 overflow-y-auto py-4 scrollbar-hide">
         <div className="px-4 space-y-6">
-          {menuGroups.map((group) => (
+          {visibleGroups.map((group) => (
             <div key={group.name} className="space-y-2">
               <h3 className="px-3 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
                 {group.name}

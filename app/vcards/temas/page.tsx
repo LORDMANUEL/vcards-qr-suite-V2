@@ -2,6 +2,8 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
+import { isValidThemeDateRange } from '@/lib/vcard-theme-calendar';
+import { themeRuntimeLayout } from '@/lib/vcard-theme-format';
 import { Sidebar } from '../../components/sidebar';
 import { Topbar } from '../../components/topbar';
 import { VCardsGuidedTour } from '../../components/vcards-guided-tour';
@@ -22,7 +24,9 @@ interface Theme {
     validTo?: string | null;
 }
 
+interface Company { id: string; name: string; }
 interface Branch {
+    companyId?: string | null;
     id: string;
     name: string;
     city?: string | null;
@@ -33,11 +37,16 @@ function VCardTemasContent() {
     const router = useRouter();
     const [themes, setThemes] = useState<Theme[]>([]);
     const [branches, setBranches] = useState<Branch[]>([]);
+    const [companies, setCompanies] = useState<Company[]>([]);
+    const [activationError, setActivationError] = useState('');
+    const [catalogError, setCatalogError] = useState('');
+    const [deletingThemeId, setDeletingThemeId] = useState<string | null>(null);
+    const [publishing, setPublishing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [scheduleTheme, setScheduleTheme] = useState<Theme | null>(null);
     const [scheduleForm, setScheduleForm] = useState({ validFrom: '', validTo: '', type: 'SEASONAL' });
     const [activateTheme, setActivateTheme] = useState<Theme | null>(null);
-    const [activationTarget, setActivationTarget] = useState<'global' | string>('global');
+    const [activationTarget, setActivationTarget] = useState('');
     const [calendarMonth, setCalendarMonth] = useState(() => {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -46,6 +55,7 @@ function VCardTemasContent() {
     useEffect(() => {
         fetchThemes();
         fetch('/api/branches').then(r => r.json()).then((data) => setBranches(data.branches || [])).catch(console.error);
+        fetch('/api/companies').then(r => r.json()).then((data) => setCompanies(data.companies || [])).catch(console.error);
     }, []);
 
     const fetchThemes = async () => {
@@ -60,47 +70,53 @@ function VCardTemasContent() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('¿Eliminar este tema?')) return;
-        await fetch(`/api/vcard-themes?id=${id}`, { method: 'DELETE' });
-        await fetchThemes();
+        if (deletingThemeId) return;
+        if (!confirm('¿Eliminar este tema? Solo se permiten borradores sin referencias en empresas, sucursales, puestos ni portales.')) return;
+        setCatalogError('');
+        setDeletingThemeId(id);
+        try {
+            const response = await fetch(`/api/vcard-themes?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.error || 'No se pudo eliminar el tema');
+            await fetchThemes();
+        } catch (error) {
+            setCatalogError(error instanceof Error ? error.message : 'No se pudo eliminar el tema');
+        } finally {
+            setDeletingThemeId(null);
+        }
     };
 
     const handleActivate = async () => {
-        if (!activateTheme) return;
-        await fetch('/api/vcard-themes', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: activateTheme.id, isActive: true }),
-        });
-
-        if (activationTarget === 'global') {
-            const payload = activateTheme.type === 'SEASONAL' || activateTheme.type === 'FESTIVE'
-                ? { seasonalVcardThemeId: activateTheme.id }
-                : { vcardThemeId: activateTheme.id };
-            await Promise.all(branches.map((branch) => fetch(`/api/branches/${branch.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            })));
-        } else {
-            const payload = activateTheme.type === 'SEASONAL' || activateTheme.type === 'FESTIVE'
-                ? { seasonalVcardThemeId: activateTheme.id }
-                : { vcardThemeId: activateTheme.id };
-            await fetch(`/api/branches/${activationTarget}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
+        if (!activateTheme || publishing) return;
+        const [scope, targetId] = activationTarget.split(':');
+        if ((scope !== 'company' && scope !== 'branch') || !targetId) {
+            setActivationError('Seleccione una empresa o sucursal.');
+            return;
         }
-
-        setActivateTheme(null);
-        setActivationTarget('global');
-        await fetchThemes();
+        setPublishing(true);
+        setActivationError('');
+        try {
+            const res = await fetch('/api/vcard-themes/publish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ themeId: activateTheme.id, scope, targetId }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data?.error || 'No se pudo publicar');
+            setActivateTheme(null);
+            setActivationTarget('');
+            await fetchThemes();
+        } catch (error) {
+            setActivationError(error instanceof Error ? error.message : 'Error de publicación');
+        } finally {
+            setPublishing(false);
+        }
     };
 
     const openActivate = (theme: Theme) => {
         setActivateTheme(theme);
-        setActivationTarget('global');
+        setActivationTarget('');
+        setActivationError('');
     };
 
     const handleClone = async (theme: Theme) => {
@@ -114,7 +130,7 @@ function VCardTemasContent() {
 
     const openSchedule = (theme: Theme) => {
         setScheduleTheme(theme);
-        const anchorDate = theme.validFrom ? new Date(theme.validFrom) : new Date();
+        const anchorDate = theme.validFrom ? new Date(`${String(theme.validFrom).slice(0, 10)}T12:00:00`) : new Date();
         setCalendarMonth(new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1));
         setScheduleForm({
             validFrom: theme.validFrom ? String(theme.validFrom).slice(0, 10) : '',
@@ -125,13 +141,23 @@ function VCardTemasContent() {
 
     const saveSchedule = async () => {
         if (!scheduleTheme) return;
-        await fetch('/api/vcard-themes', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: scheduleTheme.id, type: scheduleForm.type, validFrom: scheduleForm.validFrom || null, validTo: scheduleForm.validTo || null }),
-        });
-        setScheduleTheme(null);
-        await fetchThemes();
+        if (!isValidThemeDateRange(scheduleForm.validFrom, scheduleForm.validTo)) {
+            alert('La fecha final no puede ser anterior a la inicial.');
+            return;
+        }
+        try {
+            const response = await fetch('/api/vcard-themes', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: scheduleTheme.id, type: scheduleForm.type, validFrom: scheduleForm.validFrom || null, validTo: scheduleForm.validTo || null }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data?.error || 'No se pudo programar el tema');
+            setScheduleTheme(null);
+            await fetchThemes();
+        } catch (error) {
+            alert(error instanceof Error ? error.message : 'Error al programar');
+        }
     };
 
     const applyPreset = (preset: 'today' | 'weekend' | 'month') => {
@@ -195,7 +221,7 @@ function VCardTemasContent() {
         <div className="flex h-screen bg-gray-50">
             <Sidebar />
             <div className="flex-1 flex flex-col overflow-hidden">
-                <Topbar title="Temas de vCard" subtitle="Diseños visuales para las páginas públicas de tarjetas digitales" />
+                <Topbar title="Publicación de temas vCard" subtitle="El diseño se crea en Theme Builder. Aquí solamente se organiza, programa y publica por empresa o sucursal." />
                 <main className="flex-1 overflow-y-auto p-8">
                     <div className="flex items-center justify-between mb-8">
                         <p className="text-sm text-gray-500">Cada tema define el diseño que verá el cliente al escanear el código QR de la tarjeta</p>
@@ -211,11 +237,17 @@ function VCardTemasContent() {
                                 data-tour-id="temas-create"
                                 className="flex items-center gap-2 px-6 py-3 bg-[#003478] hover:bg-[#002557] text-white rounded-2xl font-bold shadow-lg shadow-blue-100 transition-all text-sm"
                             >
-                                <Plus className="w-4 h-4" /> Crear Tema
+                                <Plus className="w-4 h-4" /> Diseñar tema
                             </button>
                         </div>
                     </div>
 
+                    {catalogError && (
+                        <div role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                            <strong>El tema no se eliminó.</strong> {catalogError}
+                            <button type="button" onClick={() => setCatalogError('')} className="ml-3 underline">Cerrar</button>
+                        </div>
+                    )}
                     {loading ? (
                         <div className="flex justify-center py-20">
                             <div className="w-8 h-8 border-2 border-[#003478] border-t-transparent rounded-full animate-spin" />
@@ -226,10 +258,10 @@ function VCardTemasContent() {
                                 <LayoutTemplate className="w-10 h-10 text-[#003478]" />
                             </div>
                             <h3 className="text-xl font-bold text-gray-800 mb-2">Sin temas vCard</h3>
-                            <p className="text-gray-500 mb-6">Crea el primer tema con el VCard Theme Builder</p>
+                            <p className="text-gray-500 mb-6">Diseñe su primera plantilla en Theme Builder y luego publíquela aquí</p>
                             <button onClick={() => router.push('/vcards/theme-builder')}
                                 className="inline-flex items-center gap-2 px-6 py-3 bg-[#003478] text-white rounded-2xl font-bold hover:bg-[#002557]">
-                                <Plus className="w-4 h-4" /> Abrir Theme Builder
+                                <Plus className="w-4 h-4" /> Diseñar tema
                             </button>
                         </div>
                     ) : (
@@ -238,7 +270,7 @@ function VCardTemasContent() {
                                 const colors = parseColors(theme.colors);
                                 const primary = colors?.primary || '#003478';
                                 const accent = colors?.accent || '#10b981';
-                                const blocks: any[] = Array.isArray(theme.config) ? theme.config : [];
+                                const blocks = themeRuntimeLayout(theme.config);
                                 return (
                                     <div key={theme.id} data-tour-id="temas-card" className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-lg transition-all">
                                         {/* Preview */}
@@ -282,12 +314,12 @@ function VCardTemasContent() {
                                                 <button
                                                     onClick={() => router.push(`/vcards/theme-builder?themeId=${theme.id}`)}
                                                     className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-700 transition-colors">
-                                                    <Edit2 className="w-3.5 h-3.5" /> Editar
+                                                    <Edit2 className="w-3.5 h-3.5" /> Abrir diseñador
                                                 </button>
-                                                {!theme.isActive && (
+                                                {(
                                                     <button onClick={() => openActivate(theme)} data-tour-id="temas-activate"
                                                         className="flex items-center gap-1.5 py-2 px-3 bg-emerald-50 hover:bg-emerald-100 rounded-xl text-xs font-bold text-emerald-700 transition-colors">
-                                                        <Star className="w-3.5 h-3.5" /> Activar
+                                                        <Star className="w-3.5 h-3.5" /> Publicar
                                                     </button>
                                                 )}
                                                 <button onClick={() => handleClone(theme)}
@@ -412,7 +444,7 @@ function VCardTemasContent() {
                     <div className="w-full max-w-lg rounded-[2rem] bg-white shadow-2xl">
                         <div className="flex items-center justify-between border-b border-gray-100 px-8 py-6">
                             <div>
-                                <h3 className="text-xl font-black text-[#003478]">Activar tema</h3>
+                                <h3 className="text-xl font-black text-[#003478]">Publicar tema</h3>
                                 <p className="text-xs text-gray-500">{activateTheme.name}</p>
                             </div>
                             <button onClick={() => setActivateTheme(null)} className="rounded-full p-2 hover:bg-gray-100"><X className="w-4 h-4 text-gray-400" /></button>
@@ -421,17 +453,23 @@ function VCardTemasContent() {
                             <div>
                                 <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400">Aplicar a</label>
                                 <select value={activationTarget} onChange={(e) => setActivationTarget(e.target.value)} className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-[#003478]">
-                                    <option value="global">Tema global activo</option>
-                                    {branches.map((branch) => (
-                                        <option key={branch.id} value={branch.id}>{branch.companyName || 'Empresa'} - {branch.city || branch.name}</option>
-                                    ))}
-                                </select>
+                                    <option value="">Seleccione el destino</option>
+                                     {companies.map((company) => (
+                                         <optgroup key={company.id} label={company.name}>
+                                             <option value={`company:${company.id}`}>Toda la empresa: {company.name}</option>
+                                             {branches.filter((br) => br.companyId === company.id).map((br) => (
+                                                 <option key={br.id} value={`branch:${br.id}`}>Sucursal: {br.name}{br.city ? ` (${br.city})` : ''}</option>
+                                             ))}
+                                         </optgroup>
+                                     ))}
+                                 </select>
                             </div>
-                            <p className="rounded-2xl bg-blue-50 p-4 text-xs text-blue-700">Si eliges una sucursal, el tema se asigna a esa direccion. Si eliges global, se desactiva el tema global anterior y este queda como principal.</p>
+                            <p className="rounded-2xl bg-blue-50 p-4 text-xs text-blue-700">Se publica solo para la empresa o sucursal elegida. Las demás compañías mantienen su diseño independiente.</p>
+                             {activationError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-700">{activationError}</p>}
                         </div>
                         <div className="flex justify-end gap-3 border-t border-gray-100 bg-[#F8FAFC] px-8 py-6">
                             <button onClick={() => setActivateTheme(null)} className="rounded-2xl border border-gray-200 bg-white px-6 py-3 text-xs font-bold uppercase tracking-widest text-gray-500">Cancelar</button>
-                            <button onClick={handleActivate} className="rounded-2xl bg-[#003478] px-6 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-blue-100">Activar tema</button>
+                            <button onClick={handleActivate} disabled={publishing || !activationTarget} className="rounded-2xl bg-[#003478] px-6 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-blue-100">{publishing ? 'Publicando...' : 'Publicar tema'}</button>
                         </div>
                     </div>
                 </div>

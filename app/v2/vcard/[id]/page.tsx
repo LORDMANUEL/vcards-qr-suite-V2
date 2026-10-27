@@ -54,7 +54,7 @@ const getVCardData = cache(async (id: string) => {
   }
 
   const activeGlobalTheme = await prisma.theme.findFirst({
-    where: { category: 'VCARD', isActive: true },
+    where: { category: 'VCARD', isActive: true, companyId: null },
     orderBy: { updatedAt: 'desc' },
   });
 

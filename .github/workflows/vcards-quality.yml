@@ -1,0 +1,55 @@
+name: VCards quality gates
+
+on:
+  pull_request:
+    branches: [main, fix/vcards-company-branch-integrity-20261026]
+  push:
+    branches: [main, 'feat/**', 'fix/**', 'chore/**', 'integration/**']
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: postgresql://vcards_ci:vcards_ci@127.0.0.1:5432/vcards_ci?schema=public
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ci-only-not-for-production
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vcards_ci
+          POSTGRES_PASSWORD: vcards_ci
+          POSTGRES_DB: vcards_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vcards_ci -d vcards_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout reviewed commit
+        uses: actions/checkout@v4
+      - name: Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - name: Install pinned dependencies
+        run: npm ci
+      - name: Validate Prisma schema
+        run: npx prisma validate
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Lint
+        run: npm run lint
+      - name: Production build
+        run: npm run build

@@ -34,6 +34,9 @@ interface Company {
 export default function VcardCompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
+  const [orphanBranches, setOrphanBranches] = useState<Array<{id: string; name: string; city?: string | null; companyName?: string | null}>>([]);
+  const [orphanBranchId, setOrphanBranchId] = useState('');
+  const [linkingBranch, setLinkingBranch] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showBranchModal, setShowBranchModal] = useState(false);
   const [editing, setEditing] = useState<Company | null>(null);
@@ -47,16 +50,18 @@ export default function VcardCompaniesPage() {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
   };
-  const [formData, setFormData] = useState({ name: '', slug: '', logoUrl: '', primaryColor: '#003478', secondaryColor: '#FFFFFF', defaultVcardThemeId: '', seasonalVcardThemeId: '', baseCity: 'San Pedro Sula', baseAddress: '', country: 'Honduras', branches: [{ city: 'Tegucigalpa', address: '', uniqueSlug: '' }] as Array<{ city: string; address: string; uniqueSlug: string }> });
+  const [formData, setFormData] = useState({ name: '', slug: '', logoUrl: '', primaryColor: '#003478', secondaryColor: '#FFFFFF', defaultVcardThemeId: '', seasonalVcardThemeId: '', baseCity: 'San Pedro Sula', baseAddress: '', country: 'Honduras', branches: [] as Array<{ city: string; address: string; uniqueSlug: string }> });
   const [branchForm, setBranchForm] = useState({ city: '', address: '', uniqueSlug: '' });
 
   const loadData = async () => {
-    const [companiesRes, themesRes] = await Promise.all([
+    const [companiesRes, themesRes, branchesRes] = await Promise.all([
       fetch('/api/companies').then((r) => r.json()),
       fetch('/api/themes?category=VCARD').then((r) => r.json()),
+      fetch('/api/branches').then((r) => r.json()),
     ]);
     setCompanies(companiesRes.companies || []);
     setThemes(themesRes.themes || []);
+    setOrphanBranches((branchesRes.branches || []).filter((branch: { companyId?: string | null }) => !branch.companyId));
   };
 
   useEffect(() => { loadData(); }, []);
@@ -75,11 +80,11 @@ export default function VcardCompaniesPage() {
         baseCity: company.branches?.[0]?.city || 'San Pedro Sula',
         baseAddress: '',
         country: 'Honduras',
-        branches: company.branches?.slice(1).map((branch) => ({ city: branch.city || '', address: '', uniqueSlug: '' })) || [{ city: 'Tegucigalpa', address: '', uniqueSlug: '' }],
+        branches: [],
       });
     } else {
       setEditing(null);
-      setFormData({ name: '', slug: '', logoUrl: '', primaryColor: '#003478', secondaryColor: '#FFFFFF', defaultVcardThemeId: '', seasonalVcardThemeId: '', baseCity: 'San Pedro Sula', baseAddress: '', country: 'Honduras', branches: [{ city: 'Tegucigalpa', address: '', uniqueSlug: '' }] });
+      setFormData({ name: '', slug: '', logoUrl: '', primaryColor: '#003478', secondaryColor: '#FFFFFF', defaultVcardThemeId: '', seasonalVcardThemeId: '', baseCity: 'San Pedro Sula', baseAddress: '', country: 'Honduras', branches: [] });
     }
     setWizardStep(1);
     setShowModal(true);
@@ -116,19 +121,34 @@ export default function VcardCompaniesPage() {
   const saveCompany = async () => {
     const url = editing ? `/api/companies/${editing.id}` : '/api/companies';
     const method = editing ? 'PUT' : 'POST';
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
-    setShowModal(false);
-    await loadData();
+    try {
+      const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || 'No fue posible guardar la empresa');
+      setShowModal(false);
+      await loadData();
+      showToast('Empresa guardada.', 'ok');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Error al guardar empresa');
+    }
   };
 
   const deleteCompany = async (id: string) => {
-    if (!confirm('Eliminar empresa vCard?')) return;
-    await fetch(`/api/companies/${id}`, { method: 'DELETE' });
-    await loadData();
+    if (!confirm('Eliminar empresa vCard? Solo se permitirá cuando no tenga sucursales vinculadas.')) return;
+    try {
+      const response = await fetch(`/api/companies/${id}`, { method: 'DELETE' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || 'No fue posible eliminar la empresa');
+      await loadData();
+      showToast('Empresa eliminada.', 'ok');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Error al eliminar la empresa');
+    }
   };
 
   const openBranchModal = (company: Company) => {
     setSelectedCompany(company);
+    setOrphanBranchId('');
     setBranchForm({ city: '', address: '', uniqueSlug: '' });
     setShowBranchModal(true);
   };
@@ -136,7 +156,7 @@ export default function VcardCompaniesPage() {
   const createBranch = async () => {
     if (!selectedCompany || !branchForm.city) return;
     const branchName = `${selectedCompany.name} - ${branchForm.city}`;
-    await fetch('/api/branches', {
+    const response = await fetch('/api/branches', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -148,8 +168,38 @@ export default function VcardCompaniesPage() {
         uniqueSlug: branchForm.uniqueSlug || `${selectedCompany.slug || selectedCompany.name.toLowerCase()}-${branchForm.city.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
       }),
     });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      showToast(data?.error || 'No se pudo crear la sucursal');
+      return;
+    }
     setShowBranchModal(false);
     await loadData();
+  };
+
+  // Explicit, administrator-approved association; no guessing by city or companyName.
+  const linkExistingBranch = async () => {
+    if (!selectedCompany || !orphanBranchId || linkingBranch) return;
+    const orphan = orphanBranches.find((branch) => branch.id === orphanBranchId);
+    if (!orphan) return;
+    if (!confirm(`¿Vincular la sucursal existente "${orphan.name}" (ID ${orphan.id}) a "${selectedCompany.name}"?\nNo se creará una sucursal nueva ni cambiará el QR.`)) return;
+    setLinkingBranch(true);
+    try {
+      const response = await fetch(`/api/branches/${orphan.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId: selectedCompany.id }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || 'No se pudo vincular la sucursal');
+      await loadData();
+      setOrphanBranchId('');
+      showToast('Sucursal existente vinculada correctamente.', 'ok');
+      setShowBranchModal(false);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Error vinculando sucursal');
+    } finally {
+      setLinkingBranch(false);
+    }
   };
 
   const deleteBranch = async (branchId: string, branchName: string) => {
@@ -345,7 +395,7 @@ export default function VcardCompaniesPage() {
 
             <div className="border-b border-gray-100 px-8 py-4">
               <div className="flex items-center gap-3">
-                {[1, 2, 3].map((step) => (
+                {(editing ? [1, 2] : [1, 2, 3]).map((step) => (
                   <div key={step} className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-black uppercase tracking-widest ${wizardStep === step ? 'bg-[#003478] text-white' : 'bg-gray-100 text-gray-400'}`}>
                     <span>{step}</span>
                     <span>{step === 1 ? 'Branding' : step === 2 ? 'Temas' : 'Sucursales'}</span>
@@ -374,10 +424,7 @@ export default function VcardCompaniesPage() {
                       </div>
                     </div>
                   ) : null}
-                  <input value={formData.baseCity} onChange={(e) => setFormData({ ...formData, baseCity: e.target.value })} placeholder="Ciudad base" className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-[#003478] md:col-span-2" />
-                  <input value={formData.baseAddress} onChange={(e) => setFormData({ ...formData, baseAddress: e.target.value })} placeholder="Direccion sucursal principal" className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-[#003478] md:col-span-2" />
-                  <input value={formData.country} onChange={(e) => setFormData({ ...formData, country: e.target.value })} placeholder="Pais" className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-[#003478] md:col-span-2" />
-                  <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                  {!editing && <p className="md:col-span-2 rounded-xl bg-blue-50 p-3 text-xs text-blue-700">La empresa se crea sin sucursales automáticas. Agregue las sedes nuevas en el paso 3 o vincule las existentes por su ID.</p>}                  <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
                     <Palette className="w-4 h-4 text-gray-400" />
                     <input type="color" value={formData.primaryColor} onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })} />
                     <span className="text-xs font-bold text-gray-500">Color primario</span>
@@ -400,6 +447,7 @@ export default function VcardCompaniesPage() {
                     <option value="">Tema estacional</option>
                     {themes.filter((theme) => theme.category === 'VCARD').map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}
                   </select>
+                   {editing && <p className="md:col-span-2 text-sm text-gray-500">Las sucursales se administran por separado. Editar el branding no modifica sus nombres ni crea registros.</p>}
                 </>
               ) : null}
 
@@ -407,15 +455,16 @@ export default function VcardCompaniesPage() {
                 <div className="md:col-span-2 rounded-2xl border border-gray-200 bg-gray-50 p-4">
                   <div className="mb-4 flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-black text-gray-900">Sucursales adicionales por ciudad</p>
-                      <p className="text-xs text-gray-400">La empresa tambien se crea como sucursal principal automaticamente.</p>
+                      <p className="text-sm font-black text-gray-900">Sucursales de esta empresa (opcional)</p>
+                      <p className="text-xs text-gray-400">No se crean sucursales automáticas. Agregue solo sedes nuevas; las existentes se vinculan por ID.</p>
                     </div>
                     <button type="button" onClick={addDraftBranch} className="rounded-xl bg-[#003478] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white">
                       <Plus className="mr-1 inline w-3 h-3" /> Agregar ciudad
                     </button>
                   </div>
                   <div className="space-y-3">
-                    {formData.branches.map((branch, index) => (
+                    {formData.branches.length === 0 && <p className="mb-3 text-xs text-gray-500">Sin sucursales nuevas: puede guardar solamente la empresa.</p>}
+                     {formData.branches.map((branch, index) => (
                       <div key={`draft-branch-${index}`} className="grid grid-cols-1 gap-3 rounded-2xl border border-gray-200 bg-white p-4 md:grid-cols-[1fr_1.2fr_1fr_auto]">
                         <input value={branch.city} onChange={(e) => updateDraftBranch(index, { city: e.target.value })} placeholder="Ciudad" className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-[#003478]" />
                         <input value={branch.address} onChange={(e) => updateDraftBranch(index, { address: e.target.value })} placeholder="Direccion" className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-[#003478]" />
@@ -432,7 +481,7 @@ export default function VcardCompaniesPage() {
               <button onClick={() => setShowModal(false)} className="rounded-2xl border border-gray-200 bg-white px-6 py-3 text-xs font-bold uppercase tracking-widest text-gray-500">Cancelar</button>
               <div className="ml-auto flex gap-3">
                 {wizardStep > 1 ? <button onClick={() => setWizardStep((prev) => (prev - 1) as 1 | 2 | 3)} className="rounded-2xl border border-gray-200 bg-white px-6 py-3 text-xs font-bold uppercase tracking-widest text-gray-500"><ArrowLeft className="mr-1 inline w-3 h-3" />Anterior</button> : null}
-                {wizardStep < 3 ? <button onClick={() => setWizardStep((prev) => (prev + 1) as 1 | 2 | 3)} className="rounded-2xl bg-[#003478] px-6 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-blue-100">Siguiente<ArrowRight className="ml-1 inline w-3 h-3" /></button> : <button onClick={saveCompany} className="rounded-2xl bg-[#003478] px-6 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-blue-100">Guardar Empresa</button>}
+                {wizardStep < (editing ? 2 : 3) ? <button onClick={() => setWizardStep((prev) => (prev + 1) as 1 | 2 | 3)} className="rounded-2xl bg-[#003478] px-6 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-blue-100">Siguiente<ArrowRight className="ml-1 inline w-3 h-3" /></button> : <button onClick={saveCompany} className="rounded-2xl bg-[#003478] px-6 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-blue-100">Guardar Empresa</button>}
               </div>
             </div>
           </div>
@@ -453,6 +502,19 @@ export default function VcardCompaniesPage() {
               <input value={branchForm.city} onChange={(e) => setBranchForm({ ...branchForm, city: e.target.value })} placeholder="Ciudad" className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-[#003478]" />
               <input value={branchForm.address} onChange={(e) => setBranchForm({ ...branchForm, address: e.target.value })} placeholder="Direccion" className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-[#003478]" />
               <input value={branchForm.uniqueSlug} onChange={(e) => setBranchForm({ ...branchForm, uniqueSlug: e.target.value })} placeholder="slug de sucursal" className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-[#003478]" />
+               <div className="mt-3 border-t border-gray-200 pt-5">
+                 <p className="text-sm font-bold text-[#003478]">Vincular una sucursal existente</p>
+                 <p className="mt-1 text-xs text-gray-500">Si ya existe, no cree otra: seleccione la sucursal sin empresa y vincúlela por su ID. Conserva sus vCards, usuarios y QR.</p>
+                 <select value={orphanBranchId} onChange={(e) => setOrphanBranchId(e.target.value)} className="mt-3 w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm">
+                   <option value="">Seleccione la sucursal sin empresa</option>
+                   {orphanBranches.map((branch) => (
+                     <option key={branch.id} value={branch.id}>{branch.name} · {branch.city || 'Sin ciudad'} · {branch.companyName || 'Sin empresa'} · {branch.id.slice(-8)}</option>
+                   ))}
+                 </select>
+                 <button type="button" onClick={linkExistingBranch} disabled={!orphanBranchId || linkingBranch} className="mt-3 rounded-xl bg-emerald-700 px-4 py-3 text-xs font-bold text-white disabled:opacity-40">
+                   {linkingBranch ? 'Vinculando...' : 'Vincular esta sucursal a la empresa'}
+                 </button>
+               </div>
             </div>
             <div className="flex justify-end gap-3 border-t border-gray-100 px-8 py-6 bg-[#F8FAFC]">
               <button onClick={() => setShowBranchModal(false)} className="rounded-2xl border border-gray-200 bg-white px-6 py-3 text-xs font-bold uppercase tracking-widest text-gray-500">Cancelar</button>
