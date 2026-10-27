@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../lib/prisma';
+import { canDeleteTheme } from '../lib/vcard-theme-deletion';
 
 /**
  * ONLY runs against a disposable PostgreSQL database created by CI.
@@ -67,13 +68,18 @@ test('PostgreSQL contract: multi-company branches, vCard transaction and theme F
       assert.equal(after?.name, 'Contacto CI');
       assert.equal(await prisma.vCard.count({ where: { userId } }), 1);
 
-      // A theme referenced by Company must survive delete attempts (FK safety).
+      // Optional Prisma FK references may have ON DELETE SET NULL.
+      // Never rely on the database to reject deletion: our API must enforce 409.
       const theme = await prisma.theme.create({
         data: { name: `CI Tema ${suffix}`, category: 'VCARD', type: 'CORPORATE', isActive: true },
       });
       themeId = theme.id;
       await prisma.company.update({ where: { id: companyId }, data: { defaultVcardThemeId: themeId } });
-      await assert.rejects(prisma.theme.delete({ where: { id: themeId } }));
+      const companies = await prisma.company.count({ where: { defaultVcardThemeId: themeId } });
+      assert.equal(companies, 1);
+      assert.equal(canDeleteTheme({ companies, branches: 0, positionRules: 0, accessPoints: 0 }), false);
+      const storedCompany = await prisma.company.findUnique({ where: { id: companyId } });
+      assert.equal(storedCompany?.defaultVcardThemeId, themeId);
       assert.ok(await prisma.theme.findUnique({ where: { id: themeId } }));
     } finally {
       // Disposable fixtures only. CI database is isolated and short-lived.
