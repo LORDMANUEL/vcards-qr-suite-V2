@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { explicitCompanyBranches } from '@/lib/company-onboarding';
+import { isScopedDirectoryAllowed, scopedDirectoryBranchId } from '@/lib/directory-scope';
 import { isUnusedCompanyTheme } from '@/lib/company-theme-policy';
 
 function slugify(value: string) {
@@ -41,13 +42,18 @@ async function ensureCompanyDefaultTheme(tx: any, body: any) {
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const role = String(session.user.role);
+  const branchId = scopedDirectoryBranchId(role, session.user.branchId);
+  if (!isScopedDirectoryAllowed(branchId)) return NextResponse.json({ error: 'Sin sucursal asignada' }, { status: 403 });
 
   const companies = await prisma.company.findMany({
+    ...(branchId ? { where: { branches: { some: { id: branchId } } } } : {}),
     orderBy: { createdAt: 'desc' },
     include: {
       defaultVcardTheme: { select: { id: true, name: true } },
       seasonalVcardTheme: { select: { id: true, name: true } },
       branches: {
+        ...(branchId ? { where: { id: branchId } } : {}),
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
         select: {
           id: true,
@@ -62,7 +68,12 @@ export async function GET() {
     },
   });
 
-  return NextResponse.json({ companies });
+  // A matching company alone does not grant access to its other branches.
+  // Do not reveal total hidden branch counts in the response either.
+  const scopedCompanies = branchId
+    ? companies.map(company => ({ ...company, _count: { branches: company.branches.length } }))
+    : companies;
+  return NextResponse.json({ companies: scopedCompanies });
 }
 
 export async function POST(req: Request) {

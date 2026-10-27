@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { isScopedDirectoryAllowed, scopedDirectoryBranchId } from '@/lib/directory-scope';
 import { canManageCompanies } from '@/lib/permissions';
 import { validBranchRegistration } from '@/lib/branch-create-policy';
 
@@ -12,8 +13,11 @@ export async function GET(req: Request) {
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const branchId = scopedDirectoryBranchId(String(session.user.role), session.user.branchId);
+    if (!isScopedDirectoryAllowed(branchId)) return NextResponse.json({ error: 'Sin sucursal asignada' }, { status: 403 });
 
     const branches = await prisma.branch.findMany({
+      ...(branchId ? { where: { id: branchId } } : {}),
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
       include: {
         _count: {

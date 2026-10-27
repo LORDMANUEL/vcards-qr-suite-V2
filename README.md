@@ -53,6 +53,11 @@ La rama histórica `integration/vcards-v2-codex-20261026` contiene #2–#9. **La
 
 **Nota:** solo la rama integrada dispone de estos archivos hasta que se revisen y fusionen los cambios. Compilar en CI no equivale a probar los servicios 9301/9306 ni autoriza modificar la base real.
 
+## Lote PR #17–#26
+Rama acumulativa de trabajo **`security/vcards-company-branch-directory-rbac-20261027`**, dependiente de los PR previos; no forma parte de main ni de la IP en producción.
+
+[Manual técnico del lote para Codex](docs/v2/CODEX_PR17_PR26_HANDOFF_2026-10-27.md) — contiene arquitectura de dependencias, pruebas esperadas, limitaciones y rollback.
+
 ## Desarrollo local
 
 Requisitos: Node.js compatible con Next 14, PostgreSQL y variables privadas `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL` configuradas fuera del repositorio. No reutilizar valores de CI para producción.
@@ -91,6 +96,16 @@ Los cambios se revisan por fases y no deben desplegarse todos a la vez:
 | [#14](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/14) | Archivado/restauración sin perder QR ni Scan | #13 |
 | [#15](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/15) | Verificación V1 SSR HMAC y exclusión de archivadas | #14 |
 | [#16](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/16) | Retención de usuarios y prevención de eliminaciones en cascada | #15 |
+| [#17](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/17) | Validación de fecha/paginación de Scan | #16 |
+| [#18](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/18) | Validación de eventos de escaneo | #17 |
+| [#19](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/19) | Exportación VCF segura | #18 |
+| [#20](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/20) | Protección de edición vCard | #19 |
+| [#21](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/21) | Alta de Branch con Company FK | #20 |
+| [#22](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/22) | Borrador Theme propio para Company | #21 |
+| [#23](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/23) | Edición/eliminación Company sin orfandad | #22 |
+| [#24](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/24) | Metadata V2 firmada y privada | #23 |
+| [#25](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/25) | RBAC de métricas por Branch | #24 |
+| [#26](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/26) | RBAC de empresas/sucursales | #25 |
 
 **Criterio de aceptación:** CI del SHA final aprobado, revisión de código, QA integrada (empresa Ford/GAC/Quick Lane), URLs/QR históricos, privacidad, datos reales en staging, respaldo/restauración, plan operacional y aprobación explícita. CI verde no implica pruebas E2E ni autorización de despliegue.
 
