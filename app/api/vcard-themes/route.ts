@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { canManageThemes } from '@/lib/permissions';
+import { isValidThemeDateRange } from '@/lib/vcard-theme-calendar';
 
 // GET - Lista todos los temas vCard o uno específico por ID
 export async function GET(request: NextRequest) {
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
         const { name, layoutJson, configJson, type, validFrom, validTo, cloneThemeId } = body;
+        if (!isValidThemeDateRange(validFrom, validTo)) return NextResponse.json({ error: 'Rango de fechas inválido' }, { status: 422 });
 
         if (cloneThemeId) {
             const sourceTheme = await prisma.theme.findUnique({ where: { id: cloneThemeId } });
@@ -117,6 +119,7 @@ export async function PUT(request: NextRequest) {
     try {
         const body = await request.json();
         const { id, name, layoutJson, isActive, type, validFrom, validTo } = body;
+        if (!isValidThemeDateRange(validFrom, validTo)) return NextResponse.json({ error: 'Rango de fechas inválido' }, { status: 422 });
 
         if (!id) {
             return NextResponse.json({ error: 'ID is required' }, { status: 400 });
