@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { canManageCompanies } from '@/lib/permissions';
+import { canManageCompanies, canBulkImportVcards } from '@/lib/permissions';
+import { canEditCard } from '@/lib/vcard-edit-policy';
 import { branchBelongsToCompany } from '@/lib/branch-integrity';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,7 @@ export async function PUT(
 
     const role = String(session.user.role);
     const canManageAny = canManageCompanies(role);
+    if (!canManageAny && !canBulkImportVcards(role)) return NextResponse.json({ error: 'Sin permisos de edición' }, { status: 403 });
 
     const body = await request.json();
     const { name, position, email, phone, website, photoUrl, branchId, companyId } = body;
@@ -33,7 +35,7 @@ export async function PUT(
 
     const vcard = await prisma.vCard.findUnique({
       where: { id: params.id },
-      include: { user: true, branch: true },
+      include: { user: { include: { _count: { select: { vcards: true } } } }, branch: true },
     });
 
     if (!vcard) {
@@ -43,9 +45,14 @@ export async function PUT(
       );
     }
 
-    if (!canManageAny && (session.user.branchId !== branchId || session.user.branchId !== vcard.branchId)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const policy = canEditCard({
+      cardActive: vcard.isActive,
+      userActive: vcard.user.isActive,
+      userCards: vcard.user._count.vcards,
+      admin: canManageAny,
+      sameBranch: session.user.branchId === branchId && session.user.branchId === vcard.branchId,
+    });
+    if (policy !== 'ok') return NextResponse.json({ error: policy === 'archived' ? 'Restaure la tarjeta antes de editarla' : policy === 'shared' ? 'La cuenta tiene varias vCards: edite el perfil compartido con un procedimiento específico' : 'Operación no autorizada' }, { status: policy === 'denied' ? 403 : 409 });
 
     const selectedBranch = await prisma.branch.findUnique({ where: { id: branchId } });
     if (!selectedBranch) {
@@ -71,10 +78,11 @@ export async function PUT(
     });
 
     // Keep vCard tied to the selected existing branch.
-      await tx.vCard.update({
-        where: { id: params.id },
+      const changed = await tx.vCard.updateMany({
+        where: { id: params.id, isActive: true, user: { isActive: true } },
         data: { branchId: selectedBranch.id },
       });
+      if (changed.count !== 1) throw new Error('VCARD_EDIT_CONFLICT');
     });
 
     const updatedVCard = await prisma.vCard.findUnique({
@@ -106,6 +114,9 @@ export async function PUT(
 
     return NextResponse.json({ vcard: updatedVCard });
   } catch (error) {
+    if (error instanceof Error && error.message === 'VCARD_EDIT_CONFLICT') {
+      return NextResponse.json({ error: 'La tarjeta se archivó o desactivó durante la edición. Recargue los datos.' }, { status: 409 });
+    }
     console.error('Error updating vCard:', error);
     return NextResponse.json(
       { error: 'Error al actualizar vCard' },
