@@ -4,6 +4,7 @@ import { getDeviceType, getLocationFromIP } from '@/lib/geolocation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { canViewVcards } from '@/lib/permissions';
+import { parseScanReportQuery } from '@/lib/scan-query';
 
 const RATE_LIMIT_MS = 60000;
 const MAX_SCANS_PER_MINUTE = Number(process.env.VCARD_MAX_SCANS_PER_MINUTE || 15);
@@ -97,24 +98,17 @@ export async function GET(request: NextRequest) {
   }
   const { searchParams } = new URL(request.url);
   const vcardId = searchParams.get('vcardId');
-  const page = Math.max(0, parseInt(searchParams.get('page') || '0', 10));
-  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
-  const from = searchParams.get('from'); // YYYY-MM-DD
-  const to = searchParams.get('to');     // YYYY-MM-DD
-
-  if (!vcardId) {
-    return NextResponse.json({ error: 'vcardId is required' }, { status: 400 });
-  }
+  const query = parseScanReportQuery(searchParams);
+  if (!query.ok) return NextResponse.json({ error: query.error }, { status: 400 });
+  const { page, limit, from, to } = query;
+  if (!vcardId) return NextResponse.json({ error: 'vcardId is required' }, { status: 400 });
 
   try {
-    const dateFilter: { gte?: Date; lt?: Date } = {};
-    if (from) dateFilter.gte = new Date(from + 'T00:00:00.000Z');
-    if (to) {
-      const toDate = new Date(to + 'T00:00:00.000Z');
-      toDate.setDate(toDate.getDate() + 1);
-      dateFilter.lt = toDate;
-    }
-    const hasDateFilter = from || to;
+    const dateFilter = {
+      ...(from ? { gte: from } : {}),
+      ...(to ? { lt: to } : {}),
+    };
+    const hasDateFilter = Boolean(from || to);
     const where = {
       vcardId,
       ...(hasDateFilter ? { scannedAt: dateFilter } : {}),
@@ -135,10 +129,10 @@ export async function GET(request: NextRequest) {
         _count: true,
       }),
       prisma.$queryRaw<{ date: string; count: number }[]>`
-        SELECT DATE("scannedAt") as date, COUNT(*)::int as count
+        SELECT ("scannedAt" AT TIME ZONE 'America/Tegucigalpa')::date as date, COUNT(*)::int as count
         FROM "Scan"
         WHERE "vcardId" = ${vcardId}
-        GROUP BY DATE("scannedAt")
+        GROUP BY ("scannedAt" AT TIME ZONE 'America/Tegucigalpa')::date
         ORDER BY date DESC
         LIMIT 30
       `,
