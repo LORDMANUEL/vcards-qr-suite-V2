@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { themeRuntimeLayout, themeStudioDocument } from '@/lib/vcard-theme-format';
 import { saveAs } from 'file-saver';
 import {
   AlignCenter,
@@ -28,7 +29,6 @@ import {
   MousePointer2,
   Move,
   Plus,
-  QrCode,
   Redo2,
   RotateCw,
   Ruler,
@@ -1050,8 +1050,7 @@ function EditorContent() {
   const [savedThemes, setSavedThemes] = useState<any[]>([]);
   const [leftTab, setLeftTab] = useState<'widgets' | 'layers'>('widgets');
   const [draggingLayerId, setDraggingLayerId] = useState<string | null>(null);
-  const [showQRPreview, setShowQRPreview] = useState(false);
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState('');
 
   const currentElements = useMemo(() => [...doc.elements].sort((a, b) => a.zIndex - b.zIndex), [doc.elements]);
   const runtimePreviewLayout = useMemo(() => convertElementsToRuntimeLayout(doc.elements), [doc.elements]);
@@ -1103,7 +1102,16 @@ function EditorContent() {
   };
 
   const loadSavedTheme = (theme: any) => {
-    const config = Array.isArray(theme.config) ? theme.config : [];
+    const originalStudioDoc = themeStudioDocument(theme.config);
+    if (originalStudioDoc) {
+      setDoc(originalStudioDoc as StudioDocument);
+      setThemeName(theme.name);
+      setEditingThemeId(theme.id);
+      setShowThemeSelector(false);
+      setSelectedIds([]);
+      return;
+    }
+    const config = themeRuntimeLayout(theme.config);
     const W = 375;
     let currentY = 0;
 
@@ -1412,58 +1420,58 @@ function EditorContent() {
   };
 
   const handleSave = async () => {
-    if (!themeName.trim()) return;
-    // Validación: debe tener Header, Perfil y Footer
-    const hasHeader = doc.elements.some(e => e.kind === 'header');
-    const hasProfile = doc.elements.some(e => e.kind === 'profile');
-    const hasFooter = doc.elements.some(e => e.kind === 'footer');
+    if (!themeName.trim() || isSaving) return;
+    const hasHeader = doc.elements.some(e => e.kind === 'header' && e.visible !== false);
+    const hasProfile = doc.elements.some(e => e.kind === 'profile' && e.visible !== false);
+    const hasFooter = doc.elements.some(e => e.kind === 'footer' && e.visible !== false);
     if (!hasHeader || !hasProfile || !hasFooter) {
-      alert(`El tema debe contener al menos:\n${!hasHeader ? '\u2022 Bloque Header\n' : ''}${!hasProfile ? '\u2022 Bloque Perfil\n' : ''}${!hasFooter ? '\u2022 Bloque Footer' : ''}`);
+      setSaveError('Incluya un encabezado, perfil y pie de página visibles antes de guardar.');
       return;
     }
+    setSaveError('');
     setIsSaving(true);
     try {
       const layoutJson = convertElementsToRuntimeLayout(doc.elements);
-      
-      let res;
-      if (editingThemeId) {
-        res = await fetch('/api/vcard-themes', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: editingThemeId, name: themeName, layoutJson }),
-        });
-      } else {
-        res = await fetch('/api/vcard-themes', {
+      const payload = { name: themeName.trim(), layoutJson, studioDoc: doc };
+      const saveDraft = async (name: string) => {
+        const response = await fetch('/api/vcard-themes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: themeName, layoutJson }),
+          body: JSON.stringify({ ...payload, name }),
         });
-      }
-      const data = await res.json();
-      if (data.success || data.theme) {
-        setShowSaveModal(false);
-        if (!editingThemeId && data.theme) {
-          setEditingThemeId(data.theme.id);
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.theme?.id) throw new Error(result.error || 'No se pudo crear el borrador');
+        return result.theme as { id: string; name: string };
+      };
+      let saved: { id: string; name: string };
+      if (editingThemeId) {
+        const response = await fetch('/api/vcard-themes', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, id: editingThemeId }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (response.status === 409 && result.code === 'THEME_PUBLISHED') {
+          if (!window.confirm('Este tema está publicado. Para no modificar las vCards activas, ¿desea guardar una nueva versión en borrador?')) {
+            return;
+          }
+          saved = await saveDraft(`${themeName.trim()} (borrador)`);
+        } else if (!response.ok || !result.theme?.id) {
+          throw new Error(result.error || 'Error al actualizar el diseño');
+        } else {
+          saved = result.theme as { id: string; name: string };
         }
-        fetchSavedThemes();
+      } else {
+        saved = await saveDraft(themeName.trim());
       }
-    } catch (e) {
-      console.error(e);
-    }
-    setIsSaving(false);
-  };
-
-  const generatePreviewQR = async () => {
-    try {
-      const QRCode = (await import('qrcode')).default;
-      const url = editingThemeId
-        ? `${window.location.origin}/vcards/theme-builder?themeId=${editingThemeId}`
-        : window.location.href;
-      const dataUrl = await QRCode.toDataURL(url, { width: 240, margin: 2, color: { dark: '#003478', light: '#ffffff' } });
-      setQrDataUrl(dataUrl);
-      setShowQRPreview(true);
-    } catch (e) {
-      console.error('Error generating QR:', e);
+      setEditingThemeId(saved.id);
+      setThemeName(saved.name);
+      setShowSaveModal(false);
+      await fetchSavedThemes();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'No se pudo guardar el diseño');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1724,6 +1732,10 @@ function EditorContent() {
 
       {/* Main Area */}
       <div className="flex-1 flex flex-col">
+        <div className="border-b border-blue-900 bg-[#102a4b] px-4 py-2 text-xs text-blue-100">
+          <strong>1. Diseñe</strong> con widgets y vista previa · <strong>2. Guarde</strong> un borrador · <strong>3. Publique</strong> por empresa o sucursal en el catálogo.
+          <span className="ml-2 text-blue-200">La vista previa usa datos de demostración, no genera QR públicos.</span>
+        </div>
         {/* Toolbar */}
         <div className="h-14 bg-gray-800 border-b border-gray-700 flex items-center px-4 gap-4">
           {!showLeftPanel && <button onClick={() => setShowLeftPanel(true)}><PanelLeftOpen size={20} /></button>}
@@ -1744,13 +1756,13 @@ function EditorContent() {
           </div>
           <div className="h-6 w-px bg-gray-600" />
           <div className="flex items-center gap-1">
-            <button onClick={() => doc.canvas.snap = !doc.canvas.showGrid} className={`p-2 rounded ${doc.canvas.snap ? 'bg-green-600' : 'hover:bg-gray-700'}`} title="Snap to grid"><Grid3X3 size={18} /></button>
+            <button onClick={() => setDoc(d => ({ ...d, canvas: { ...d.canvas, snap: !d.canvas.snap } }))} className={`p-2 rounded ${doc.canvas.snap ? 'bg-green-600' : 'hover:bg-gray-700'}`} title="Snap to grid"><Grid3X3 size={18} /></button>
             <button onClick={() => setDoc(d => ({ ...d, canvas: { ...d.canvas, showGrid: !d.canvas.showGrid } }))} className={`p-2 rounded ${doc.canvas.showGrid ? 'bg-blue-600' : 'hover:bg-gray-700'}`} title="Show grid"><Grid size={18} /></button>
             <button onClick={() => setDoc(d => ({ ...d, canvas: { ...d.canvas, showRulers: !d.canvas.showRulers } }))} className={`p-2 rounded ${doc.canvas.showRulers ? 'bg-blue-600' : 'hover:bg-gray-700'}`} title="Show rulers"><Ruler size={18} /></button>
           </div>
           <div className="flex-1" />
           <button onClick={applyDarkModePreset} className="p-2 rounded hover:bg-gray-700" title="Modo oscuro/claro"><Palette size={18} /></button>
-          <button onClick={generatePreviewQR} className="p-2 rounded hover:bg-gray-700" title="QR para vista previa móvil"><QrCode size={18} /></button>
+          <a href="/vcards/temas" className="px-3 py-2 rounded bg-blue-600 hover:bg-blue-700 text-xs font-semibold" title="Publicar diseños guardados">Publicar temas</a>
           <button onClick={() => setShowPreviewPanel(!showPreviewPanel)} className={`p-2 rounded ${showPreviewPanel ? 'bg-purple-600' : 'hover:bg-gray-700'}`}><Eye size={18} /></button>
           <button onClick={() => setShowSaveModal(true)} className="flex items-center gap-2 px-4 py-2 bg-green-600 rounded hover:bg-green-700"><Save size={18} /> Guardar</button>
         </div>
@@ -1874,11 +1886,13 @@ function EditorContent() {
       {showSaveModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-gray-800 rounded-lg p-6 w-96">
-            <h3 className="font-bold text-lg mb-4">{editingThemeId ? 'Actualizar Tema' : 'Guardar Tema'}</h3>
+            <h3 className="font-bold text-lg mb-2">{editingThemeId ? 'Guardar cambios del tema' : 'Guardar borrador'}</h3>
+            <p className="text-xs text-gray-300 mb-4">Diseñe aquí. La publicación a empresas y sucursales se realiza después en Publicar temas.</p>
             <input type="text" placeholder="Nombre del tema" value={themeName} onChange={(e) => setThemeName(e.target.value)}
               className="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600 focus:border-blue-500 outline-none" />
+            {saveError && <p role="alert" className="mt-3 rounded border border-red-500 bg-red-900/40 p-2 text-xs text-red-100">{saveError}</p>}
             <div className="flex gap-3 mt-6">
-              <button onClick={() => { setShowSaveModal(false); setEditingThemeId(null); }} className="flex-1 py-2 bg-gray-700 rounded hover:bg-gray-600">Cancelar</button>
+              <button onClick={() => { setShowSaveModal(false); setSaveError(''); }} className="flex-1 py-2 bg-gray-700 rounded hover:bg-gray-600">Cancelar</button>
               <button onClick={handleSave} disabled={!themeName.trim() || isSaving} className="flex-1 py-2 bg-green-600 rounded hover:bg-green-700 disabled:opacity-50">
                 {isSaving ? 'Guardando...' : (editingThemeId ? 'Actualizar' : 'Guardar')}
               </button>
@@ -1933,33 +1947,6 @@ function EditorContent() {
         </div>
       )}
 
-      {/* QR Preview Modal */}
-      {showQRPreview && qrDataUrl && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowQRPreview(false)}>
-          <div className="bg-gray-800 rounded-xl p-6 w-80 text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg">Vista previa en móvil</h3>
-              <button onClick={() => setShowQRPreview(false)} className="text-gray-400 hover:text-white p-1 rounded"><X size={20} /></button>
-            </div>
-            <div className="bg-white p-3 rounded-xl inline-block mb-3">
-              <img src={qrDataUrl} alt="QR" className="w-48 h-48 mx-auto" />
-            </div>
-            <p className="text-sm text-gray-300 mb-1">Escanea con tu teléfono</p>
-            {editingThemeId
-              ? <p className="text-xs text-green-400 mt-2">✓ Abre el builder con este tema cargado</p>
-              : <p className="text-xs text-yellow-400 mt-2">💡 Guarda el tema primero para la URL exacta</p>
-            }
-            <a
-              href={editingThemeId ? `/vcards/theme-builder?themeId=${editingThemeId}` : '/vcards/theme-builder'}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-block text-xs text-blue-400 hover:text-blue-300 underline"
-            >
-              Abrir en nueva pestaña
-            </a>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
