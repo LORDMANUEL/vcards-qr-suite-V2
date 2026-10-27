@@ -61,13 +61,21 @@ const getVCardData = cache(async (id: string) => {
   return JSON.parse(JSON.stringify({ vcard, activeGlobalTheme }));
 });
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+export async function generateMetadata({
+  params, searchParams,
+}: { params: { id: string }; searchParams?: { sig?: string } }): Promise<Metadata> {
+  // Next.js generates metadata before rendering the page. Never query a person's
+  // name/company for a request whose QR signature is invalid.
+  if (!verifyVCardSignature(params.id, searchParams?.sig)) {
+    return { title: 'vCard no disponible', robots: { index: false, follow: false } };
+  }
   const data = await getVCardData(params.id);
-  if (!data?.vcard) return { title: 'vCard no encontrada' };
+  if (!data?.vcard) return { title: 'vCard no encontrada', robots: { index: false, follow: false } };
   const company = data.vcard.branch?.companyName || data.vcard.branch?.name || 'Contacto digital';
   return {
     title: `${data.vcard.user.name} | ${company}`,
     description: `Contacto profesional de ${data.vcard.user.name} en ${company}.`,
+    robots: { index: false, follow: false },
   };
 }
 
