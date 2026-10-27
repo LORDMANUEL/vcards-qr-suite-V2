@@ -3,22 +3,10 @@ export const dynamic = 'force-dynamic';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
+import { explicitCompanyBranches } from '@/lib/company-onboarding';
 
 function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
-
-function normalizeBranches(branches: any[] | undefined, companyName: string) {
-  if (!Array.isArray(branches)) return [];
-  return branches
-    .filter((branch) => branch?.city)
-    .map((branch) => ({
-      name: branch.name || `${companyName} - ${branch.city}`,
-      city: branch.city,
-      address: branch.address || null,
-      country: branch.country || 'Honduras',
-      uniqueSlug: branch.uniqueSlug || slugify(`${companyName}-${branch.city}`),
-    }));
 }
 
 async function ensureCompanyDefaultTheme(tx: any, body: any) {
@@ -84,13 +72,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const body = await req.json();
-  const company = await prisma.$transaction(async (tx) => {
+  const body = await req.json().catch(() => null);
+  const name = typeof body?.name === 'string' ? body.name.trim() : '';
+  if (!name) return NextResponse.json({ error: 'El nombre de la empresa es obligatorio' }, { status: 400 });
+
+  // Explicit branches only; never synthesize the first branch from Company.name.
+  let branchesToCreate: ReturnType<typeof explicitCompanyBranches>;
+  try {
+    branchesToCreate = explicitCompanyBranches(body?.branches, name);
+  } catch {
+    return NextResponse.json({ error: 'Hay sucursales duplicadas o identificadores inválidos' }, { status: 422 });
+  }
+
+  const existing = await prisma.company.findFirst({ where: { name: { equals: name, mode: 'insensitive' } }, select: { id: true } });
+  if (existing) return NextResponse.json({ error: 'Ya existe una empresa con ese nombre. Edítela o vincule sus sucursales existentes.' }, { status: 409 });
+
+  try {
+    const company = await prisma.$transaction(async (tx) => {
     const defaultThemeId = await ensureCompanyDefaultTheme(tx, body);
     const created = await tx.company.create({
       data: {
-        name: body.name,
-        slug: body.slug || slugify(body.name),
+        name,
+        slug: body.slug || slugify(name),
         logoUrl: body.logoUrl || null,
         primaryColor: body.primaryColor || '#003478',
         secondaryColor: body.secondaryColor || '#FFFFFF',
@@ -99,25 +102,9 @@ export async function POST(req: Request) {
       },
     });
 
-    await tx.branch.create({
-      data: {
-        companyId: created.id,
-        companyName: created.name,
-        name: body.baseBranchName || body.name,
-        city: body.baseCity || body.city || null,
-        address: body.baseAddress || body.address || null,
-        country: body.country || 'Honduras',
-        uniqueSlug: slugify(body.baseBranchName || body.name),
-        primaryColor: created.primaryColor,
-        secondaryColor: created.secondaryColor,
-        logoUrl: created.logoUrl,
-        vcardThemeId: created.defaultVcardThemeId,
-        seasonalVcardThemeId: created.seasonalVcardThemeId,
-        sortOrder: 0,
-      },
-    });
-
-    const extraBranches = normalizeBranches(body.branches, created.name);
+    // Do not insert an implicit Company-as-Branch record.
+    // Existing branches are reconciled by ID in the company management UI.
+    const extraBranches = branchesToCreate;
     if (extraBranches.length) {
       await tx.branch.createMany({
         data: extraBranches.map((branch, index) => ({
@@ -133,13 +120,17 @@ export async function POST(req: Request) {
           logoUrl: created.logoUrl,
           vcardThemeId: created.defaultVcardThemeId,
           seasonalVcardThemeId: created.seasonalVcardThemeId,
-          sortOrder: index + 1,
+          sortOrder: index,
         })),
       });
     }
 
     return created;
-  });
+    });
 
-  return NextResponse.json({ company }, { status: 201 });
+    return NextResponse.json({ company }, { status: 201 });
+  } catch (error) {
+    console.error('Error creating company:', error);
+    return NextResponse.json({ error: 'No se pudo crear la empresa. Revise nombre, slug y sucursales duplicadas.' }, { status: 409 });
+  }
 }
