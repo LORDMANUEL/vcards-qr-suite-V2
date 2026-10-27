@@ -9,6 +9,7 @@
 - [#4 — Estudio impresión CR80 y QR firmado](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/4): base main, independiente.
 - [#5 — Portal Manager y navegación separada](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/5): base main, independiente.
 - [#7 — Theme Builder sin pérdida de capas](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/7): **apilado sobre #3**, que depende de #2. Al rebasar, validar serialización `Theme.config.layout` en runtimes 9301/9306 y protección contra edición de temas publicados.
+- [#8 — Alta de empresas sin crear sede implícita](https://github.com/LORDMANUEL/vcards-qr-suite-V2/pull/8): apilado sobre #2. Integre después de corregir integridad; verifique creación de Company con 0 sucursales y listado de sedes explícitas sin duplicados.
 - CI + instrucciones de despliegue en este PR de documentación.
 
 ## Estado real
@@ -61,5 +62,5 @@ No afirmar '100% funcional' ni desplegado si no se ha observado el sistema activ
 - Cada PR debe aprobar Prisma validate/generate, `typecheck`, `npm test`, `npm run lint` y `npm run build` sobre **su SHA final**, no el del PR de CI.
 - PR #7 introduce formato JSON reversible `{layout,studioDoc}`; antes de usarlo, comprobar compatibilidad del servicio 9301 si comparte DB con 9306. Si es incompatible, conservar temas en formato legacy hasta actualizar ambas rutas o aislar datos.
 - Las actualizaciones de un tema publicado devuelven 409; UI ofrece guardar borrador independiente para que el tema público anterior quede estable.
-- Secuencia obligatoria: #6 para CI y README, #2 integridad, #3 publicaciones, #7 editor reversible. #4 impresión y #5 portales pueden revisarse por separado, pero comprobar regresiones al integrarlos.
+- Secuencia sugerida: #6 para CI y README, #2 integridad, #8 altas explícitas, #3 publicaciones, #7 editor reversible. #4 impresión y #5 portales pueden revisarse por separado, pero comprobar regresiones al integrarlos.
 - Deuda técnica pendiente: programación independiente por sucursal con ThemePublication/ThemeVersion, pruebas de navegador reales e impresión física. No afirmar esas funciones implementadas.
