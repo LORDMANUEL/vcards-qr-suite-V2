@@ -27,6 +27,12 @@ flowchart TD
   I --> K[Revisión humana y staging real pendientes]
 ```
 
+## Hallazgo confirmado con PostgreSQL efímero
+
+La primera ejecución confirmó que el esquema se puede crear, que el test de transacción atómica se supera y que la vinculación `Company → Theme` se almacena. Sin embargo, una eliminación directa de `Theme` referenciada por la relación opcional de `Company` no garantizó error de FK (la referencia puede quedar anulada por la política de cascada/SetNull). La prueba inicial que presuponía rechazo de la base falló; la asunción era incorrecta.
+
+**Implicación:** la validación explícita de `DELETE /api/vcard-themes` del PR #9 es indispensable. El test se corrigió para verificar la referencia real, el conteo relacional y `canDeleteTheme(...) === false` antes de eliminar, sin destruir temas vinculados. El bloqueo HTTP 409 completo todavía requiere integración de API/NextAuth en staging.
+
 ## QA no cubierta
 - No levanta el servidor Next ni reproduce autenticación/RBAC, Service Layer, servicio 9301 o 9306 real. Tampoco realiza capturas browser, escaneo físico, ni reproducciones históricas con la BD existente.
 - No prueba concurrencia real simultánea de POST HTTP ni contratos de APIs bajo NextAuth. Requiere test E2E de staging con datos anonimizados.
