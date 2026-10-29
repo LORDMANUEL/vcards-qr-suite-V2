@@ -80,6 +80,10 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+        const actor = await themeActor(session);
+        if (!actor.admin && !actor.companyId) {
+            return NextResponse.json({ error: 'Vincule su usuario a una sucursal antes de diseñar temas' }, { status: 403 });
+        }
         const body = await request.json();
         const { name, layoutJson, studioDoc, type, validFrom, validTo, cloneThemeId } = body;
         if (!isValidThemeDateRange(validFrom, validTo)) return NextResponse.json({ error: 'Rango de fechas inválido' }, { status: 422 });
@@ -144,7 +148,7 @@ export async function POST(request: NextRequest) {
                 colors: colorsJson,
                 config: themeConfig as any,
                 isActive: false,
-                companyId: (await themeActor(session)).companyId,
+                companyId: actor.companyId,
                 validFrom: validFrom ? new Date(validFrom) : null,
                 validTo: validTo ? new Date(validTo) : null,
             }
