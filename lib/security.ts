@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifySignedVCard } from '@/lib/vcard-signing';
+import { safeSignatureAudit } from '@/lib/security-audit-redaction';
 
 const MAX_SCANS_PER_MINUTE = Number(process.env.VCARD_MAX_SCANS_PER_MINUTE || 15);
 const WINDOW_MS = 60 * 1000;
@@ -39,7 +40,7 @@ export async function securityCheck(req: Request, vcardId?: string) {
     try {
         const rateLimited = await isRateLimitedByRecentScans(ip);
         if (rateLimited) {
-            console.warn(`[SECURITY] Rate limit exceeded for IP: ${ip}. Possible Scraping Attack.`);
+            console.warn('[SECURITY] Public profile rate limit exceeded');
             return {
                 allowed: false,
                 response: NextResponse.json({
@@ -67,7 +68,7 @@ export async function securityCheck(req: Request, vcardId?: string) {
                 action: 'SECURITY_ALERT',
                 entityName: 'VCard',
                 entityId: vcardId,
-                details: JSON.stringify({ type: 'SIGNATURE_REQUIRED', reason: 'missing_signature' }),
+                details: JSON.stringify(safeSignatureAudit('SIGNATURE_REQUIRED')),
                 ipAddress: ip,
             }
         }).catch(console.error);
@@ -92,7 +93,7 @@ export async function securityCheck(req: Request, vcardId?: string) {
             };
         }
         if (!verifyVCardSignature(vcardId, signature)) {
-            console.error(`[SECURITY] Firma Criptográfica Invalida en vCard ${vcardId} desde IP ${ip}`);
+            console.warn('[SECURITY] Invalid QR signature rejected');
 
             await prisma.auditLog.create({
                 data: {
@@ -100,7 +101,7 @@ export async function securityCheck(req: Request, vcardId?: string) {
                     action: 'SECURITY_ALERT',
                     entityName: 'VCard',
                     entityId: vcardId,
-                    details: JSON.stringify({ type: 'HMAC_MISMATCH', attemptedSignature: signature }),
+                    details: JSON.stringify(safeSignatureAudit('HMAC_MISMATCH')),
                     ipAddress: ip
                 }
             }).catch(console.error);
