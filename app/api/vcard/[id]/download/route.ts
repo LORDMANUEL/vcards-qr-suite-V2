@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { generateVCardString } from '@/lib/qr-generator';
 import { securityCheck } from '@/lib/security';
 import { safeVcfFilename } from '@/lib/safe-vcf-filename';
+import { vcfCompanyName } from '@/lib/vcf-company';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +37,7 @@ export async function GET(
       position: vcard?.user?.position ?? undefined,
       email: vcard?.user?.email ?? '',
       phone: vcard?.user?.phone ?? undefined,
-      company: vcard?.branch?.name ?? 'Ford Yude Canahuati',
+      company: vcfCompanyName(vcard.branch),
       website: vcard?.user?.website ?? undefined,
       address: vcard?.branch?.address ?? undefined,
       photoUrl: vcard?.user?.photoUrl ?? undefined,
