@@ -8,6 +8,7 @@ import { canBulkImportVcards, canManageSystemUsers } from '@/lib/permissions';
 import { usersDirectoryPolicy } from '@/lib/users-directory-policy';
 import { secureUserCreation } from '@/lib/secure-user-creation';
 import { randomBytes } from 'node:crypto';
+import type { UserRole } from '@prisma/client';
 
 export async function GET(req: Request) {
     try {
@@ -72,7 +73,7 @@ export async function POST(req: Request) {
                 name,
                 email,
                 password: hashedPassword,
-                role,
+                role: role as UserRole,
                 isSystemUser: finalIsSystemUser,
                 position,
                 phone,
