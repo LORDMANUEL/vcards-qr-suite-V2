@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { canManageSystemUsers } from '@/lib/permissions';
 import { deleteUnlinkedUser } from '@/lib/user-retention';
+import { validateUserPrivilegeChange } from '@/lib/user-privilege-policy';
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     try {
@@ -56,11 +57,18 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         if (!existingUser) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
+        const privilegeError = validateUserPrivilegeChange({
+            actorId: String(session.user.id), actorRole: String(session.user.role),
+            targetId: existingUser.id, currentRole: existingUser.role,
+            currentSystem: existingUser.isSystemUser,
+            requestedRole: role, requestedSystem: isSystemUser, requestedActive: isActive,
+        });
+        if (privilegeError) return NextResponse.json({ error: privilegeError }, { status: 403 });
 
         const dataToUpdate: any = {
             name,
             email,
-            role,
+            ...(role !== undefined ? { role } : {}),
             ...(isSystemUser !== undefined ? { isSystemUser } : {}),
             position,
             phone,
@@ -81,16 +89,20 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
             data: dataToUpdate,
         });
 
-        // Audit Log
-        await prisma.auditLog.create({
-            data: {
-                userId: session.user.id,
-                action: 'UPDATED',
-                entityName: 'User',
-                entityId: user.id,
-                details: JSON.stringify({ email: user.email, role: user.role }),
-            }
-        });
+        // Audit failure must not cause false retry of an already committed edit.
+        try {
+            await prisma.auditLog.create({
+                data: {
+                    userId: session.user.id,
+                    action: 'UPDATED',
+                    entityName: 'User',
+                    entityId: user.id,
+                    details: JSON.stringify({ email: user.email, role: user.role }),
+                },
+            });
+        } catch (auditError) {
+            console.error('User updated, audit event failed:', auditError);
+        }
 
         const { password: _, ...safeUser } = user;
         return NextResponse.json({ user: safeUser });
