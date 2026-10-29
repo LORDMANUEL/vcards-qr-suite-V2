@@ -2,6 +2,9 @@ import { cache, Suspense } from 'react';
 import type { Metadata } from 'next';
 import { prisma } from '@/lib/prisma';
 import ClientVCardPage from './client-page';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 import { notFound } from 'next/navigation';
 import { verifyVCardSignature } from '@/lib/security';
 
