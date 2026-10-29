@@ -9,6 +9,7 @@ import { persistVCardTheme } from '@/lib/vcard-theme-format';
 import { canCloneThemeInCompany } from '@/lib/theme-clone-access';
 import { canManageCompanies } from '@/lib/permissions';
 import { canDeleteTheme } from '@/lib/vcard-theme-deletion';
+import { isThemeKind } from '@/lib/vcard-theme-type';
 import { canReadTheme, canWriteTheme } from '@/lib/theme-tenant-access';
 
 async function themeActor(session: { user?: { role?: string; branchId?: string | null } }) {
@@ -86,6 +87,9 @@ export async function POST(request: NextRequest) {
         }
         const body = await request.json();
         const { name, layoutJson, studioDoc, type, validFrom, validTo, cloneThemeId } = body;
+        if (type !== undefined && !isThemeKind(type)) {
+            return NextResponse.json({ error: 'Tipo de tema inválido' }, { status: 422 });
+        }
         if (!isValidThemeDateRange(validFrom, validTo)) return NextResponse.json({ error: 'Rango de fechas inválido' }, { status: 422 });
 
         if (cloneThemeId) {
@@ -174,6 +178,9 @@ export async function PUT(request: NextRequest) {
     try {
         const body = await request.json();
         const { id, name, layoutJson, studioDoc, isActive, type, validFrom, validTo } = body;
+        if (type !== undefined && !isThemeKind(type)) {
+            return NextResponse.json({ error: 'Tipo de tema inválido' }, { status: 422 });
+        }
         if (!isValidThemeDateRange(validFrom, validTo)) return NextResponse.json({ error: 'Rango de fechas inválido' }, { status: 422 });
 
         if (!id) {
