@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { canManageCompanies } from '@/lib/permissions';
 import { getRequestedCompanyId } from '@/lib/branch-integrity';
+import { themeAssignmentAllowed } from '@/lib/branch-theme-ownership';
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     try {
@@ -102,7 +103,27 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
             companyPatch = { companyId: selectedCompany.id, companyName: selectedCompany.name };
         }
 
-        const branch = await prisma.branch.update({
+        const current = await prisma.branch.findUnique({ where: { id: params.id }, select: { id: true, companyId: true } });
+        if (!current) return NextResponse.json({ error: 'Sucursal no encontrada' }, { status: 404 });
+        const effectiveCompanyId = requestedCompanyId || current.companyId;
+        if (!effectiveCompanyId) return NextResponse.json({ error: 'Vincule primero la sucursal a una empresa' }, { status: 422 });
+
+        const requestedThemes = [
+          { id: vcardThemeId, category: 'VCARD' }, { id: seasonalVcardThemeId, category: 'VCARD' },
+          { id: themeId, category: 'VCARD' }, { id: portalThemeId, category: 'PORTAL' },
+          ...(Array.isArray(vcardPositionThemeRules) ? vcardPositionThemeRules.map((rule: any) => ({ id: rule?.themeId, category: 'VCARD' })) : []),
+        ].filter(entry => typeof entry.id === 'string' && entry.id.length > 0);
+        const themeRecords = requestedThemes.length ? await prisma.theme.findMany({
+          where: { id: { in: requestedThemes.map(t => t.id) } },
+          select: { id: true, companyId: true, category: true },
+        }) : [];
+        if (!themeAssignmentAllowed(themeRecords, requestedThemes, effectiveCompanyId)) {
+          return NextResponse.json({ error: 'Un tema no existe, es de otro tipo o pertenece a otra empresa' }, { status: 422 });
+        }
+
+        // Atomic branch metadata + position rules: no partial update on failure.
+        const branch = await prisma.$transaction(async tx => {
+        const updated = await tx.branch.update({
             where: { id: params.id },
             data: {
                 ...companyPatch,
@@ -150,7 +171,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         if (Array.isArray(vcardPositionThemeRules)) {
             for (const rule of vcardPositionThemeRules) {
                 if (!rule?.positionGroup) continue;
-                await prisma.vCardPositionThemeRule.upsert({
+                await tx.vCardPositionThemeRule.upsert({
                     where: {
                         branchId_positionGroup: {
                             branchId: params.id,
@@ -170,6 +191,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
                 });
             }
         }
+
+        return updated;
+        }, { isolationLevel: 'Serializable' });
 
         const updatedBranch = await prisma.branch.findUnique({
             where: { id: params.id },
@@ -196,66 +220,36 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-    try {
-        const session = await getServerSession(authOptions);
-        if (!session || !session.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-        if (!canManageCompanies(String(session.user.role))) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
-
-        const branch = await prisma.branch.findUnique({
-            where: { id: params.id },
-            select: {
-                id: true,
-                portalConfig: { select: { id: true } },
-                _count: {
-                    select: {
-                        users: true,
-                        vcards: true,
-                        accessPoints: true,
-                        portalSessions: true,
-                        vcardPositionThemeRules: true,
-                    }
-                }
-            }
-        });
-
-        if (!branch) {
-            return NextResponse.json({ error: 'Branch not found' }, { status: 404 });
-        }
-
-        const hasDependencies =
-            branch._count.users > 0 ||
-            branch._count.vcards > 0 ||
-            branch._count.accessPoints > 0 ||
-            branch._count.portalSessions > 0 ||
-            branch._count.vcardPositionThemeRules > 0 ||
-            Boolean(branch.portalConfig);
-
-        if (hasDependencies) {
-            return NextResponse.json({
-                error: 'No se puede borrar la sucursal porque tiene datos asociados (usuarios, vcards, access points, sesiones o reglas de tema por puesto).',
-                dependencies: {
-                    users: branch._count.users,
-                    vcards: branch._count.vcards,
-                    accessPoints: branch._count.accessPoints,
-                    portalSessions: branch._count.portalSessions,
-                    vcardPositionThemeRules: branch._count.vcardPositionThemeRules,
-                    portalConfig: Boolean(branch.portalConfig),
-                }
-            }, { status: 409 });
-        }
-
-        await prisma.branch.delete({
-            where: { id: params.id },
-        });
-
-        return NextResponse.json({ message: 'Branch deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting branch:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  if (!canManageCompanies(String(session.user.role))) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 });
+  try {
+    const result = await prisma.$transaction(async tx => {
+      // Lock the parent row while checking *all* dependent relationships.
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "Branch" WHERE "id" = ${params.id} FOR UPDATE
+      `;
+      if (!locked.length) return { status: 'missing' } as const;
+      const branch = await tx.branch.findUnique({
+        where: { id: params.id },
+        select: { portalConfig: { select: { id: true } }, _count: { select: {
+          users: true, vcards: true, accessPoints: true, portalSessions: true, vcardPositionThemeRules: true,
+        } } },
+      });
+      if (!branch) return { status: 'missing' } as const;
+      const counts = { ...branch._count, portalConfig: Number(Boolean(branch.portalConfig)) };
+      if (Object.values(counts).some(n => n > 0)) return { status: 'blocked', counts } as const;
+      await tx.branch.delete({ where: { id: params.id } });
+      return { status: 'deleted' } as const;
+    }, { isolationLevel: 'Serializable' });
+    if (result.status === 'missing') return NextResponse.json({ error: 'Sucursal no encontrada' }, { status: 404 });
+    if (result.status === 'blocked') {
+      return NextResponse.json({ error: 'Esta sucursal conserva usuarios, QR, nodos o sesiones. No se puede eliminar.', dependencies: result.counts }, { status: 409 });
     }
+    return NextResponse.json({ deleted: true });
+  } catch (error) {
+    console.error('Branch delete transaction failed', error);
+    return NextResponse.json({ error: 'Sucursal ocupada o cambió concurrentemente; no se eliminó.' }, { status: 409 });
+  }
 }

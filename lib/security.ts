@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import CryptoJS from 'crypto-js';
-import { timingSafeEqual } from 'node:crypto';
+import { verifySignedVCard } from '@/lib/vcard-signing';
 
 const MAX_SCANS_PER_MINUTE = Number(process.env.VCARD_MAX_SCANS_PER_MINUTE || 15);
 const WINDOW_MS = 60 * 1000;
@@ -9,11 +8,7 @@ const REQUIRE_VCARD_SIGNATURE = process.env.REQUIRE_VCARD_SIGNATURE === 'true';
 
 export function verifyVCardSignature(vcardId: string, signature?: string | null) {
     if (!signature) return !REQUIRE_VCARD_SIGNATURE;
-    const secret = process.env.NEXTAUTH_SECRET;
-    if (!secret) return false;
-    const expected = CryptoJS.HmacSHA256(vcardId, secret).toString(CryptoJS.enc.Hex);
-    if (signature.length !== expected.length) return false;
-    return timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    return verifySignedVCard(vcardId, signature);
 }
 
 function extractIp(req: Request) {
@@ -87,7 +82,7 @@ export async function securityCheck(req: Request, vcardId?: string) {
     }
 
     if (vcardId && signature) {
-        const secret = process.env.NEXTAUTH_SECRET;
+        const secret = process.env.VCARD_SIGNING_SECRET || process.env.NEXTAUTH_SECRET || process.env.VCARD_LEGACY_SIGNING_SECRET;
         if (!secret) {
             console.error('[SECURITY] NEXTAUTH_SECRET is not configured.');
             return {
