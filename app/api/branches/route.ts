@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { isScopedDirectoryAllowed, scopedDirectoryBranchId } from '@/lib/directory-scope';
 import { canManageCompanies } from '@/lib/permissions';
 import { validBranchRegistration } from '@/lib/branch-create-policy';
+import { themeAssignmentAllowed } from '@/lib/branch-theme-ownership';
 
 export async function GET(req: Request) {
   try {
@@ -86,11 +87,19 @@ export async function POST(req: Request) {
     const resolvedLogoUrl = logoUrl || company.logoUrl;
 
     // Do not attach another company's theme via this generic branch endpoint.
-    const referenced = [resolvedThemeId, resolvedSeasonalThemeId, portalThemeId, themeId].filter((x): x is string => typeof x === 'string' && x.length > 0);
-    if (referenced.length) {
-      const themes = await prisma.theme.findMany({ where: { id: { in: referenced } }, select: { id: true, companyId: true } });
-      if (themes.length !== new Set(referenced).size || themes.some(t => t.companyId && t.companyId !== companyId)) {
-        return NextResponse.json({ error: 'Un tema no existe o pertenece a otra empresa' }, { status: 422 });
+    const requests = [
+      { id: resolvedThemeId, category: 'VCARD' },
+      { id: resolvedSeasonalThemeId, category: 'VCARD' },
+      { id: themeId, category: 'VCARD' },
+      { id: portalThemeId, category: 'PORTAL' },
+    ].filter((entry): entry is { id: string; category: string } => typeof entry.id === 'string' && entry.id.length > 0);
+    if (requests.length) {
+      const themes = await prisma.theme.findMany({
+        where: { id: { in: requests.map(t => t.id) } },
+        select: { id: true, companyId: true, category: true },
+      });
+      if (!themeAssignmentAllowed(themes, requests, companyId)) {
+        return NextResponse.json({ error: 'Tema inexistente, de otra empresa o categoría incompatible' }, { status: 422 });
       }
     }
     const lastBranch = await prisma.branch.findFirst({

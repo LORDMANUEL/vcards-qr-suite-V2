@@ -164,7 +164,7 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
     fetch('/api/vcards/click', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vcardId: vcard.id, actionType }),
+      body: JSON.stringify({ vcardId: vcard.id, actionType, sig: new URLSearchParams(window.location.search).get('sig') }),
     }).catch(() => {});
   };
 

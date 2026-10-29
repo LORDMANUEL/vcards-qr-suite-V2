@@ -1,4 +1,5 @@
 import QRCode from 'qrcode';
+import { serializeVcfLines } from './vcf-format';
 
 function sanitizeVCardValue(value?: string): string {
   if (!value) return '';
@@ -60,8 +61,7 @@ export function generateVCardString(data: {
     photoUrl ? `PHOTO;VALUE=URL:${photoUrl}` : '',
     'END:VCARD',
   ]
-    .filter(Boolean)
-    .join('\n');
+    .filter(Boolean);
 
-  return vcard;
+  return serializeVcfLines(vcard);
 }

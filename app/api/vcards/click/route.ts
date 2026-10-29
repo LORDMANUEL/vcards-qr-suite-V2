@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { validClickEvent } from '@/lib/vcard-click-policy';
+import { verifyVCardSignature } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,29 +9,20 @@ const ALLOWED_ACTION_TYPES = new Set(['tel', 'email', 'wa', 'download', 'share',
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { vcardId, actionType } = body;
-
-    if (!vcardId || !actionType) {
-      return NextResponse.json({ error: 'vcardId and actionType required' }, { status: 400 });
-    }
-
-    // Sanitize actionType to prevent injection
-    const safeType = String(actionType).replace(/[^a-z0-9_]/gi, '').slice(0, 30);
-
-    if (!ALLOWED_ACTION_TYPES.has(safeType)) {
-      return NextResponse.json({ error: 'Invalid actionType' }, { status: 400 });
-    }
-
+    const body = await request.json().catch(() => null);
+    const parsed = validClickEvent(body);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    const { vcardId, actionType } = parsed;
     const vcard = await prisma.vCard.findUnique({
-      where: { id: String(vcardId) },
-      select: { id: true },
+      where: { id: vcardId },
+      select: { id: true, qrCodeData: true, isActive: true, user: { select: { isActive: true } } },
     });
-
-    if (!vcard) {
+    if (!vcard || !vcard.isActive || !vcard.user.isActive)
       return NextResponse.json({ error: 'vCard not found' }, { status: 404 });
-    }
+    if (!verifyVCardSignature(vcard.qrCodeData, typeof body.sig === 'string' ? body.sig : undefined))
+      return NextResponse.json({ error: 'Firma QR inválida' }, { status: 403 });
 
+    const safeType = actionType;
     const userAgent = request.headers.get('user-agent') || '';
     const forwarded = request.headers.get('x-forwarded-for');
     const ip = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown';

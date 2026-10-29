@@ -2,7 +2,13 @@ import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { verifyVCardSignature } from '@/lib/security';
 import { prisma } from '@/lib/prisma';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 import ClientVCardPage from './client-page';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 async function getVCardData(id: string) {
   const vcard = await prisma.vCard.findFirst({

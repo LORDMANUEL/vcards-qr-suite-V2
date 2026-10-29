@@ -70,7 +70,9 @@ export async function GET(
       orderBy: { updatedAt: 'desc' },
     });
 
-    return NextResponse.json({ vcard, activeGlobalTheme });
+    return NextResponse.json({ vcard, activeGlobalTheme }, {
+      headers: { 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex, nofollow', 'X-Content-Type-Options': 'nosniff' },
+    });
   } catch (error) {
     console.error('Error fetching vCard:', error);
     return NextResponse.json(
