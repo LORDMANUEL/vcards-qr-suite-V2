@@ -9,6 +9,8 @@ import { validateScanEvent } from '@/lib/scan-event';
 import { canReadScanReport } from '@/lib/scan-report-policy';
 import { Prisma } from '@prisma/client';
 import { scanReportWhere } from '@/lib/scan-report-filters';
+import { scanRequiresValidSignature } from '@/lib/scan-signature-policy';
+import { verifySignedVCard } from '@/lib/vcard-signing';
 
 const RATE_LIMIT_MS = 60000;
 const configuredLimit = Number(process.env.VCARD_MAX_SCANS_PER_MINUTE || 15);
@@ -48,11 +50,15 @@ export async function POST(request: NextRequest) {
 
     const vcard = await prisma.vCard.findUnique({
       where: { id: vcardId },
-      select: { id: true, isActive: true, user: { select: { isActive: true } } },
+      select: { id: true, qrCodeData: true, isActive: true, user: { select: { isActive: true } } },
     });
 
     if (!vcard || !vcard.isActive || !vcard.user.isActive) {
       return NextResponse.json({ error: 'vCard not found' }, { status: 404 });
+    }
+    if (scanRequiresValidSignature(scanMethod) &&
+        (typeof body?.sig !== 'string' || !verifySignedVCard(vcard.qrCodeData, body.sig))) {
+      return NextResponse.json({ error: 'Firma QR inválida para registrar escaneo' }, { status: 403 });
     }
 
     const userAgent = request.headers.get('user-agent') || '';

@@ -110,7 +110,7 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
       await fetch('/api/vcards/scans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vcardId: databaseVCardId, scanMethod: new URLSearchParams(window.location.search).has('sig') ? 'QR' : 'DIRECT' }),
+        body: JSON.stringify({ vcardId: databaseVCardId, scanMethod: new URLSearchParams(window.location.search).has('sig') ? 'QR' : 'DIRECT', sig: new URLSearchParams(window.location.search).get('sig') }),
       });
     } catch (e) {
       console.error('Error recording scan:', e);
