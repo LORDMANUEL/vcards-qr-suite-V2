@@ -3,7 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { getDeviceType, getLocationFromIP } from '@/lib/geolocation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { canViewVcards } from '@/lib/permissions';
+import { canViewVcards, canManageCompanies } from '@/lib/permissions';
+import { redactScanDetails } from '@/lib/scan-privacy';
 import { parseScanReportQuery } from '@/lib/scan-query';
 import { validateScanEvent } from '@/lib/scan-event';
 import { canReadScanReport } from '@/lib/scan-report-policy';
@@ -156,7 +157,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     return NextResponse.json({
-      scans,
+      scans: scans.map(scan => redactScanDetails(scan, canManageCompanies(String(session.user.role)))),
       totalScans,
       totalFiltered,
       byDevice: byDevice.map(d => ({ deviceType: d.deviceType, count: d._count })),
