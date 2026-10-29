@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { canManageCompanies } from '@/lib/permissions';
 import { getRequestedCompanyId } from '@/lib/branch-integrity';
+import { themeAssignmentAllowed } from '@/lib/branch-theme-ownership';
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     try {
@@ -102,7 +103,27 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
             companyPatch = { companyId: selectedCompany.id, companyName: selectedCompany.name };
         }
 
-        const branch = await prisma.branch.update({
+        const current = await prisma.branch.findUnique({ where: { id: params.id }, select: { id: true, companyId: true } });
+        if (!current) return NextResponse.json({ error: 'Sucursal no encontrada' }, { status: 404 });
+        const effectiveCompanyId = requestedCompanyId || current.companyId;
+        if (!effectiveCompanyId) return NextResponse.json({ error: 'Vincule primero la sucursal a una empresa' }, { status: 422 });
+
+        const requestedThemes = [
+          { id: vcardThemeId, category: 'VCARD' }, { id: seasonalVcardThemeId, category: 'VCARD' },
+          { id: themeId, category: 'VCARD' }, { id: portalThemeId, category: 'PORTAL' },
+          ...(Array.isArray(vcardPositionThemeRules) ? vcardPositionThemeRules.map((rule: any) => ({ id: rule?.themeId, category: 'VCARD' })) : []),
+        ].filter(entry => typeof entry.id === 'string' && entry.id.length > 0);
+        const themeRecords = requestedThemes.length ? await prisma.theme.findMany({
+          where: { id: { in: requestedThemes.map(t => t.id) } },
+          select: { id: true, companyId: true, category: true },
+        }) : [];
+        if (!themeAssignmentAllowed(themeRecords, requestedThemes, effectiveCompanyId)) {
+          return NextResponse.json({ error: 'Un tema no existe, es de otro tipo o pertenece a otra empresa' }, { status: 422 });
+        }
+
+        // Atomic branch metadata + position rules: no partial update on failure.
+        const branch = await prisma.$transaction(async tx => {
+        const updated = await tx.branch.update({
             where: { id: params.id },
             data: {
                 ...companyPatch,
@@ -150,7 +171,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
         if (Array.isArray(vcardPositionThemeRules)) {
             for (const rule of vcardPositionThemeRules) {
                 if (!rule?.positionGroup) continue;
-                await prisma.vCardPositionThemeRule.upsert({
+                await tx.vCardPositionThemeRule.upsert({
                     where: {
                         branchId_positionGroup: {
                             branchId: params.id,
@@ -170,6 +191,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
                 });
             }
         }
+
+        return updated;
+        }, { isolationLevel: 'Serializable' });
 
         const updatedBranch = await prisma.branch.findUnique({
             where: { id: params.id },
