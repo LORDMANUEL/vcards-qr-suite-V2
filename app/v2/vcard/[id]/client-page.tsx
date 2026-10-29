@@ -74,7 +74,7 @@ export default function ClientVCardPage({ initialData, vCardId, disableTracking 
       await fetch('/api/vcards/scans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vcardId: databaseVCardId, scanMethod }),
+        body: JSON.stringify({ vcardId: databaseVCardId, scanMethod, sig: new URLSearchParams(window.location.search).get('sig') }),
       });
     } catch (error) {
       console.error('Error recording scan:', error);
