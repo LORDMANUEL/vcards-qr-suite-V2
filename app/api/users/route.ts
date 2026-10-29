@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { canBulkImportVcards, canManageSystemUsers } from '@/lib/permissions';
+import { usersDirectoryPolicy } from '@/lib/users-directory-policy';
 
 export async function GET(req: Request) {
     try {
@@ -14,32 +15,24 @@ export async function GET(req: Request) {
         }
         const { searchParams } = new URL(req.url);
         const kind = searchParams.get('kind') || 'all';
-        if (kind === 'system' && !canManageSystemUsers(String(session.user.role))) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
-        if (kind === 'vcard' && !canBulkImportVcards(String(session.user.role))) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
+        const policy = usersDirectoryPolicy(kind, String(session.user.role), session.user.branchId);
+        if (!policy.ok) return NextResponse.json({ error: policy.error }, { status: policy.status });
 
         const users = await prisma.user.findMany({
-            where: kind === 'system' ? { isSystemUser: true } : kind === 'vcard' ? { isSystemUser: false } : undefined,
+            where: {
+                ...(policy.kind === 'system' ? { isSystemUser: true } : policy.kind === 'vcard' ? { isSystemUser: false } : {}),
+                ...(policy.branchId ? { branchId: policy.branchId } : {}),
+            },
             orderBy: { createdAt: 'desc' },
-            include: {
-                branch: {
-                    select: { name: true }
-                },
-                _count: {
-                    select: { vcards: true }
-                }
-            }
+            select: {
+                id: true, name: true, email: true, role: true, isSystemUser: true,
+                position: true, phone: true, website: true, branchId: true,
+                photoUrl: true, isActive: true, createdAt: true, updatedAt: true,
+                branch: { select: { name: true } },
+                _count: { select: { vcards: true } },
+            },
         });
-
-        // Strip sensitive info like passwords
-        const safeUsers = users.map((user: any) => {
-            const { password, ...safeUser } = user;
-            return safeUser;
-        });
-
+        const safeUsers = users;
         return NextResponse.json({ users: safeUsers });
     } catch (error) {
         console.error('Error fetching users:', error);
