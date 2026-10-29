@@ -62,6 +62,10 @@ Rama acumulativa de trabajo **`security/vcards-company-branch-directory-rbac-202
 
 La rama candidata `consolidation/vcards-pr27-pr36-20261029` reúne diez PR adicionales sin modificar `main`. Su [manual de integración para Codex](docs/v2/CONSOLIDATION_PR27_PR36_2026-10-29.md) especifica dependencias, matriz QA, continuidad 9301/9306 y rollback. **No equivale a un despliegue listo.**
 
+## Consolidación de mejoras PR #38–#47
+
+Rama acumulativa: `consolidation/vcards-pr38-pr47-20261029`. [Manual detallado de integración a Codex](docs/v2/CONSOLIDATION_PR38_PR47_2026-10-29.md). **Solo candidata de staging, no producción**.
+
 ## Desarrollo local
 
 Requisitos: Node.js compatible con Next 14, PostgreSQL y variables privadas `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL` configuradas fuera del repositorio. No reutilizar valores de CI para producción.
