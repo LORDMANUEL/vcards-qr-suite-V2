@@ -7,6 +7,8 @@ import { canViewVcards } from '@/lib/permissions';
 import { parseScanReportQuery } from '@/lib/scan-query';
 import { validateScanEvent } from '@/lib/scan-event';
 import { canReadScanReport } from '@/lib/scan-report-policy';
+import { Prisma } from '@prisma/client';
+import { scanReportWhere } from '@/lib/scan-report-filters';
 
 const RATE_LIMIT_MS = 60000;
 const configuredLimit = Number(process.env.VCARD_MAX_SCANS_PER_MINUTE || 15);
@@ -119,6 +121,9 @@ export async function GET(request: NextRequest) {
       vcardId,
       ...(hasDateFilter ? { scannedAt: dateFilter } : {}),
     };
+    const dateClause = scanReportWhere({ from, to });
+    const dateSql = Prisma.sql`${dateClause.from ? Prisma.sql`AND "scannedAt" >= ${dateClause.from}` : Prisma.empty}
+      ${dateClause.to ? Prisma.sql`AND "scannedAt" < ${dateClause.to}` : Prisma.empty}`;
 
     const [scans, totalScans, totalFiltered, byDevice, byDate] = await Promise.all([
       prisma.scan.findMany({
@@ -131,13 +136,13 @@ export async function GET(request: NextRequest) {
       prisma.scan.count({ where }),
       prisma.scan.groupBy({
         by: ['deviceType'],
-        where: { vcardId },
+        where,
         _count: true,
       }),
       prisma.$queryRaw<{ date: string; count: number }[]>`
         SELECT ("scannedAt" AT TIME ZONE 'America/Tegucigalpa')::date as date, COUNT(*)::int as count
         FROM "Scan"
-        WHERE "vcardId" = ${vcardId}
+        WHERE "vcardId" = ${vcardId} ${dateSql}
         GROUP BY ("scannedAt" AT TIME ZONE 'America/Tegucigalpa')::date
         ORDER BY date DESC
         LIMIT 30
