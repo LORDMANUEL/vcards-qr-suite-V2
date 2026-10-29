@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {validClickEvent} from '../lib/vcard-click-policy';
+test('only known click actions with valid ID pass',()=>{assert.equal(validClickEvent({vcardId:'abc12345',actionType:'email'}).ok,true);assert.equal(validClickEvent({vcardId:'abc12345',actionType:'tel'}).ok,true);});
+test('malformed/sanitized actions no longer pollute analytics',()=>{for(const v of [null,{}, {vcardId:'x',actionType:'tel'},{vcardId:'abc12345',actionType:'tel;drop'},{vcardId:'abc12345',actionType:'email '},{vcardId:'abc12345',actionType:12}])assert.equal(validClickEvent(v).ok,false);});
