@@ -6,6 +6,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { canBulkImportVcards, canManageSystemUsers } from '@/lib/permissions';
 import { usersDirectoryPolicy } from '@/lib/users-directory-policy';
+import { secureUserCreation } from '@/lib/secure-user-creation';
+import { randomBytes } from 'node:crypto';
 
 export async function GET(req: Request) {
     try {
@@ -47,19 +49,11 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const body = await req.json();
-        if (!canManageSystemUsers(String(session.user.role)) && body?.isSystemUser !== false) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
-        if (!canBulkImportVcards(String(session.user.role)) && body?.isSystemUser === false) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
-        const { name, email, password, role, position, phone, website, branchId, isActive, photoUrl, isSystemUser } = body;
-
-        if (!email || !name) {
-            return NextResponse.json({ error: 'Email and name are required' }, { status: 400 });
-        }
-
+        const body = await req.json().catch(() => null);
+        const policy = secureUserCreation(body, String(session.user.role), session.user.branchId);
+        if (!policy.ok) return NextResponse.json({ error: policy.error }, { status: policy.status });
+        const { name, email, role, branchId, isSystemUser } = policy;
+        const { password, position, phone, website, isActive, photoUrl } = body;
         const existingUser = await prisma.user.findUnique({
             where: { email },
         });
@@ -68,16 +62,17 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'User already exists' }, { status: 400 });
         }
 
-        const finalIsSystemUser = isSystemUser !== false;
-        const rawPassword = password || Math.random().toString(36).slice(2, 12);
-        const hashedPassword = await bcrypt.hash(rawPassword, 10);
+        const finalIsSystemUser = isSystemUser;
+        const rawPassword = typeof password === 'string' && password.length >= 12
+          ? password : randomBytes(32).toString('hex');
+        const hashedPassword = await bcrypt.hash(rawPassword, 12);
 
         const user = await prisma.user.create({
             data: {
                 name,
                 email,
                 password: hashedPassword,
-                role: role || 'ADVISOR',
+                role,
                 isSystemUser: finalIsSystemUser,
                 position,
                 phone,
@@ -88,8 +83,8 @@ export async function POST(req: Request) {
             },
         });
 
-        // Audit Log
-        await prisma.auditLog.create({
+        // Audit must not turn an already committed account creation into a retry.
+        try { await prisma.auditLog.create({
             data: {
                 userId: session.user.id,
                 action: 'CREATED',
@@ -99,6 +94,7 @@ export async function POST(req: Request) {
             }
         });
 
+        } catch (auditError) { console.error('User created but audit failed', auditError); }
         const { password: _, ...safeUser } = user;
         return NextResponse.json({ user: safeUser }, { status: 201 });
     } catch (error) {
