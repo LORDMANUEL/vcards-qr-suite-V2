@@ -14,7 +14,11 @@ function dateOnly(value: ThemeDateValue): string | null {
   if (!value) return null;
   if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.toISOString().slice(0, 10) : null;
   const result = String(value).slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(result) ? result : null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(result)) return null;
+  const [year, month, day] = result.split('-').map(Number);
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  return Number.isFinite(candidate.getTime()) && candidate.toISOString().slice(0, 10) === result
+    ? result : null;
 }
 export function isValidThemeDateRange(from?: ThemeDateValue, to?: ThemeDateValue): boolean {
   if (from && !dateOnly(from)) return false;
