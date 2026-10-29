@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main, fix/vcards-company-branch-integrity-20261026]
   push:
-    branches: [main, 'feat/**', 'fix/**', 'chore/**', 'integration/**', 'test/**', 'security/**']
+    branches: [main, 'feat/**', 'fix/**', 'chore/**', 'integration/**', 'test/**', 'security/**', 'consolidation/**']
 
 permissions:
   contents: read
