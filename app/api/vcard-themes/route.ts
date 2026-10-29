@@ -6,6 +6,8 @@ import { authOptions } from '@/lib/auth';
 import { canManageThemes } from '@/lib/permissions';
 import { isValidThemeDateRange } from '@/lib/vcard-theme-calendar';
 import { persistVCardTheme } from '@/lib/vcard-theme-format';
+import { canCloneThemeInCompany } from '@/lib/theme-clone-access';
+import { canManageCompanies } from '@/lib/permissions';
 import { canDeleteTheme } from '@/lib/vcard-theme-deletion';
 
 /** Check every live theme pointer: isActive alone is not sufficient (legacy data).
@@ -70,6 +72,13 @@ export async function POST(request: NextRequest) {
             if (!sourceTheme || sourceTheme.category !== 'VCARD') {
                 return NextResponse.json({ error: 'Source theme not found' }, { status: 404 });
             }
+            const role = String(session.user?.role);
+            const viewerBranch = session.user?.branchId ? await prisma.branch.findUnique({
+                where: { id: session.user.branchId }, select: { companyId: true },
+            }) : null;
+            if (!canCloneThemeInCompany(canManageCompanies(role), viewerBranch?.companyId, sourceTheme.companyId)) {
+                return NextResponse.json({ error: 'No puede clonar diseños de otra empresa' }, { status: 403 });
+            }
 
             const clonedTheme = await prisma.theme.create({
                 data: {
@@ -79,8 +88,8 @@ export async function POST(request: NextRequest) {
                     colors: sourceTheme.colors,
                     config: (sourceTheme.config ?? {}) as any,
                     isActive: false,
-                    validFrom: validFrom ? new Date(validFrom) : sourceTheme.validFrom,
-                    validTo: validTo ? new Date(validTo) : sourceTheme.validTo,
+                    validFrom: validFrom ? new Date(validFrom) : null,
+                    validTo: validTo ? new Date(validTo) : null,
                     typography: sourceTheme.typography,
                     bgImageUrl: sourceTheme.bgImageUrl,
                 }
