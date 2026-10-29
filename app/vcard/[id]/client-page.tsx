@@ -2,7 +2,7 @@
 
 import { resolveVCardTheme } from '@/lib/vcard-theme-resolver';
 import { publicVCardApiPath } from '@/lib/vcard-public-links';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Phone, Mail, MapPin, Globe, Download, Share2 } from 'lucide-react';
 import { renderVCardLayout } from '../../components/vcard-theme-runtime';
@@ -64,6 +64,7 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
   const [vcard, setVcard] = useState<VCardData['vcard'] | null>(initialData?.vcard || null);
   const [activeGlobalTheme, setActiveGlobalTheme] = useState<VCardTheme | null>(initialData?.activeGlobalTheme || null);
   const [loadingData, setLoadingData] = useState(!initialData?.vcard);
+  const scanRecordedFor = useRef<string | null>(null);
 
   useEffect(() => {
     // Fallback: if SSR data is missing, load directly from API on client.
@@ -86,9 +87,15 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
       })();
     }
 
-    // Record scan on load
-    recordScan();
   }, [vCardId, initialData?.vcard]);
+
+  // vCardId is the PUBLIC QR token. Scan.vcardId references the DATABASE ID.
+  // Record only after SSR/fallback resolves a live VCard, once per loaded ID.
+  useEffect(() => {
+    if (!vcard?.id || scanRecordedFor.current === vcard.id) return;
+    scanRecordedFor.current = vcard.id;
+    void recordScan(vcard.id);
+  }, [vcard?.id]);
 
   if (loadingData) {
     return (
@@ -98,12 +105,12 @@ export default function ClientVCardPage({ initialData, vCardId }: { initialData?
     );
   }
 
-  const recordScan = async () => {
+  const recordScan = async (databaseVCardId: string) => {
     try {
       await fetch('/api/vcards/scans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vcardId: vCardId, scanMethod: 'QR' }),
+        body: JSON.stringify({ vcardId: databaseVCardId, scanMethod: new URLSearchParams(window.location.search).has('sig') ? 'QR' : 'DIRECT' }),
       });
     } catch (e) {
       console.error('Error recording scan:', e);
