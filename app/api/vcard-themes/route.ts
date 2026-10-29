@@ -9,6 +9,16 @@ import { persistVCardTheme } from '@/lib/vcard-theme-format';
 import { canCloneThemeInCompany } from '@/lib/theme-clone-access';
 import { canManageCompanies } from '@/lib/permissions';
 import { canDeleteTheme } from '@/lib/vcard-theme-deletion';
+import { canReadTheme, canWriteTheme } from '@/lib/theme-tenant-access';
+
+async function themeActor(session: { user?: { role?: string; branchId?: string | null } }) {
+  const admin = canManageCompanies(String(session.user?.role));
+  if (admin) return { admin, companyId: null };
+  const branch = session.user?.branchId ? await prisma.branch.findUnique({
+    where: { id: session.user.branchId }, select: { companyId: true },
+  }) : null;
+  return { admin, companyId: branch?.companyId || null };
+}
 
 /** Check every live theme pointer: isActive alone is not sufficient (legacy data).
  * Editing a published theme in place can alter public vCards without approval.
@@ -36,13 +46,20 @@ export async function GET(request: NextRequest) {
     const id = searchParams.get('id');
 
     try {
+        const actor = await themeActor(session);
+        if (!actor.admin && !actor.companyId) return NextResponse.json({ error: 'Sin sucursal vinculada' }, { status: 403 });
         if (id) {
             const theme = await prisma.theme.findUnique({ where: { id } });
-            return NextResponse.json({ theme, published: theme ? await isPublishedTheme(id) : false });
+            if (!theme || theme.category !== 'VCARD' || !canReadTheme(actor, theme)) {
+                return NextResponse.json({ error: 'Tema no encontrado' }, { status: 404 });
+            }
+            return NextResponse.json({ theme, published: await isPublishedTheme(id) });
         }
 
         const themes = await prisma.theme.findMany({
-            where: { category: 'VCARD' },
+            where: { category: 'VCARD', ...(actor.admin ? {} : {
+              OR: [{ companyId: actor.companyId }, { companyId: null, isActive: true }],
+            }) },
             orderBy: { createdAt: 'desc' },
         });
         return NextResponse.json({ themes });
@@ -88,6 +105,7 @@ export async function POST(request: NextRequest) {
                     colors: sourceTheme.colors,
                     config: (sourceTheme.config ?? {}) as any,
                     isActive: false,
+                    companyId: canManageCompanies(role) ? null : viewerBranch?.companyId,
                     validFrom: validFrom ? new Date(validFrom) : null,
                     validTo: validTo ? new Date(validTo) : null,
                     typography: sourceTheme.typography,
@@ -126,6 +144,7 @@ export async function POST(request: NextRequest) {
                 colors: colorsJson,
                 config: themeConfig as any,
                 isActive: false,
+                companyId: (await themeActor(session)).companyId,
                 validFrom: validFrom ? new Date(validFrom) : null,
                 validTo: validTo ? new Date(validTo) : null,
             }
@@ -156,6 +175,10 @@ export async function PUT(request: NextRequest) {
         if (!id) {
             return NextResponse.json({ error: 'ID is required' }, { status: 400 });
         }
+        const actor = await themeActor(session);
+        const owned = await prisma.theme.findUnique({ where: { id }, select: { category: true, companyId: true } });
+        if (!owned || owned.category !== 'VCARD') return NextResponse.json({ error: 'Tema no encontrado' }, { status: 404 });
+        if (!canWriteTheme(actor, owned)) return NextResponse.json({ error: 'Tema de otra compañía o global protegido' }, { status: 403 });
         if (layoutJson !== undefined && !Array.isArray(layoutJson)) {
             return NextResponse.json({ error: 'Los bloques deben ser una lista' }, { status: 422 });
         }
@@ -225,9 +248,11 @@ export async function DELETE(request: NextRequest) {
     }
 
     try {
+        const actor = await themeActor(session);
         const deleted = await prisma.$transaction(async (tx) => {
-            const theme = await tx.theme.findUnique({ where: { id }, select: { id: true, category: true } });
+            const theme = await tx.theme.findUnique({ where: { id }, select: { id: true, category: true, companyId: true } });
             if (!theme || theme.category !== 'VCARD') return { status: 404, error: 'Tema vCard no encontrado' } as const;
+            if (!canWriteTheme(actor, theme)) return { status: 403, error: 'Solo puede eliminar borradores de su empresa' } as const;
 
             const [companies, branches, positionRules, accessPoints] = await Promise.all([
                 tx.company.count({ where: { OR: [{ defaultVcardThemeId: id }, { seasonalVcardThemeId: id }] } }),
