@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { v4 as uuidv4 } from 'uuid';
 import { authOptions } from '@/lib/auth';
 import QRCode from 'qrcode';
-import CryptoJS from 'crypto-js';
+import { signVCardId } from '@/lib/vcard-signing';
 import { createAuditLog } from '@/lib/audit';
 import { canBulkImportVcards, canManageCompanies, canViewVcards } from '@/lib/permissions';
 import bcrypt from 'bcryptjs';
@@ -118,12 +118,12 @@ export async function POST(request: Request) {
 
     // Generate the signed QR before opening a database transaction.
     // Failure to render the image must not create an orphan User.
-    const secret = process.env.NEXTAUTH_SECRET;
+    const secret = process.env.VCARD_SIGNING_SECRET || process.env.NEXTAUTH_SECRET;
     if (!secret) {
       return NextResponse.json({ error: 'NEXTAUTH_SECRET no configurado' }, { status: 500 });
     }
     const qrCodeData = uuidv4();
-    const signature = CryptoJS.HmacSHA256(qrCodeData, secret).toString(CryptoJS.enc.Hex);
+    const signature = signVCardId(qrCodeData);
     let baseUrl: string;
     try {
       baseUrl = resolvePublicVCardBaseUrl(process.env);
